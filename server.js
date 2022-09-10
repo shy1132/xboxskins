@@ -8,7 +8,7 @@ const fetch = require('node-fetch')
 const jsdom = require("jsdom");
 const fs = require('fs')
 const request = require('request')
-const StreamZip = require('node-stream-zip');
+const JSZip = require("jszip");
 const { Octokit } = require('octokit')
 const octokit = new Octokit({ auth: auth.octokit });
 
@@ -92,7 +92,6 @@ app.get('/rss/uxdash.php/download/:skin.zip', async (req, res) => {
         });
 })
 
-/*
 app.get('/rss/uxdash.php/thumb/:skin.jpg', async (req, res) => {
     console.log('request made from ' + req.headers['x-forwarded-for'])
     if (req.headers['x-forwarded-for'] !== '127.0.0.1') {
@@ -109,43 +108,27 @@ app.get('/rss/uxdash.php/thumb/:skin.jpg', async (req, res) => {
         },
         (err, resp, buffer) => {
             if (!err && resp.statusCode === 200) {
-                fs.writeFileSync('./temp/'+id+'.zip', buffer)
-                const zip = new StreamZip({ file: './temp/'+id+'.zip' });
-
-                zip.on('ready', () => {
-                    for (let i = 0; i < Object.values(zip.entries()).length; i++) {
-                        const entry = Object.values(zip.entries())[i]
-                        if(entry.name.endsWith('jpg') || entry.name.endsWith('jpeg')){
-                            const data = zip.entryDataSync(entry.name);
-                            zip.close()
-                            fs.rmSync('./temp/'+id+'.zip')
-                            res.contentType('image/jpeg')
-                            res.send(data)
-                            break;
-                        } else if(i >= Object.values(zip.entries()).length-1){
-                            zip.close()
-                            fs.rmSync('./temp/'+id+'.zip')
-                            res.contentType("image/jpeg");
-                            res.send(fs.readFileSync('./xbox/img/fb.jpg'))
-                            break;
+                    JSZip.loadAsync(buffer).then(function (zip) {
+                        for (let i = 0; i < Object.values(zip.files).length; i++) {
+                            const entry = Object.values(zip.files)[i]
+                            if(entry.name.endsWith('jpg') || entry.name.endsWith('jpeg')){
+                                zip.file(entry.name).async('nodebuffer').then(data=>{
+                                    res.contentType('image/jpeg')
+                                    res.send(data)
+                                })
+                                break;
+                            } else if(i >= Object.values(zip.files).length-1){
+                                res.contentType("image/jpeg");
+                                res.send(fs.readFileSync('./assets/thumb.jpg'))
+                                break;
+                            }
                         }
-                    }
-                    zip.close()
-                })
+            
+                    });
             } else {
                 return res.status(404).send('')
             }
         });
-})
-*/
-
-app.get('/rss/uxdash.php/thumb/:skin.jpg', async (req, res) => {
-    console.log('request made from ' + req.headers['x-forwarded-for'])
-    if (req.headers['x-forwarded-for'] !== '127.0.0.1') {
-        return res.status(404).send('')
-    }
-
-    res.send(fs.readFileSync('./assets/thumb.jpg'))
 })
 
 
