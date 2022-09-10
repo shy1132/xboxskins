@@ -18,6 +18,7 @@ app.get('/', (req, res) => {
 });
 
 app.get('/rss/uxdash.php', (req, res) => {
+    console.log('request made from '+req.headers['x-forwarded-for'])
     if(req.headers['x-forwarded-for'] !== '127.0.0.1'){
         return res.status(404).send('<rss></rss>')
     }
