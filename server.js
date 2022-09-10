@@ -17,6 +17,7 @@ const octokit = new Octokit({ auth: auth.octokit });
 const app = express()
 const { JSDOM } = jsdom;
 app.set('trust proxy', true);
+app.disable('x-powered-by');
 
 //variables
 var index = {
@@ -41,38 +42,31 @@ async function updateIndexes(){
 }
 
 updateIndexes()
+setInterval(updateIndexes, 21600000)
 
 
 //code
 
 app.get('/', (req, res) => {
-    res.send('there is no interface for the site, only the api necessary for replacing the xbox-skins.net servers in UnleashX<br><br>-shy')
+    res.send('there is no frontend for the website, only the backend servers for various xbox dashboards<br><br>i hope this is useful to anyone with those dashboards')
 });
 
 app.get('/rss/uxdash.php', (req, res) => {
     console.log('request made from '+req.headers['x-forwarded-for'])
-    if(req.headers['x-forwarded-for'] !== '127.0.0.1'){
-        return res.status(404).send('')
-    }
-
-    var items = []
+    var items = [`<item>\n<title>!unofficial UnleashX skin servers (from archive.org/details/XBUXSkins)</title>\n<author> </author>\n<link>http://xbox-skins.net/404</link>\n<thumb>http://www.xbox-skins.net/thumb.jpg</thumb>\n</item>`]
 
     for (let i = 0; i < index.unleashx.length; i++) {
         var file = index.unleashx[i]
         items.push(`<item>\n<title>${htmlEncode(file.name.slice(0, -4))}</title>\n<author> </author>\n<link>http://xbox-skins.net/rss/uxdash.php/download/${file.id}.zip</link>\n<thumb>http://www.xbox-skins.net/rss/uxdash.php/thumb/${encodeURIComponent(file.id)}.jpg</thumb>\n</item>`)
     }
 
-    var xml = `<?xml version='1.0'?>\n\n<!DOCTYPE rss PUBLIC "-//Netscape Communications//DTD RSS 0.91//E" "http://my.netscape.com/publish/formats/rss-0.91.dtd">\n\n<rss version="0.91">\n<channel>\n<title>UnleashX xbox-skins.net archive</title>\n<link>http://xbox-skins.net</link>\n<description>https://archive.org/details/XBUXSkins converted into RSS</description>\n<language>en-us</language>\n${items.join('\n')}</channel>\n</rss>`
+    var xml = `<?xml version='1.0'?>\n\n<!DOCTYPE rss PUBLIC "-//Netscape Communications//DTD RSS 0.91//E" "http://my.netscape.com/publish/formats/rss-0.91.dtd">\n\n<rss version="0.91">\n<channel>\n<title>UnleashX xbox-skins.net archive</title>\n<link>http://xbox-skins.net</link>\n<description></description>\n<language>en-us</language>\n${items.join('\n')}</channel>\n</rss>`
 
     res.contentType('text/xml')
     res.send(xml)
 })
 
 app.get('/rss/uxdash.php/download/:skin.zip', async (req, res) => {
-    console.log('request made from ' + req.headers['x-forwarded-for'])
-    if (req.headers['x-forwarded-for'] !== '127.0.0.1') {
-        return res.status(404).send('')
-    }
     if (!req.params.skin) return res.status(404).send('')
 
     const id = parseInt(req.params.skin)
@@ -93,10 +87,6 @@ app.get('/rss/uxdash.php/download/:skin.zip', async (req, res) => {
 })
 
 app.get('/rss/uxdash.php/thumb/:skin.jpg', async (req, res) => {
-    console.log('request made from ' + req.headers['x-forwarded-for'])
-    if (req.headers['x-forwarded-for'] !== '127.0.0.1') {
-        return res.status(404).send('')
-    }
     if (!req.params.skin) return res.status(404).send('')
 
     const id = parseInt(req.params.skin)
@@ -130,6 +120,20 @@ app.get('/rss/uxdash.php/thumb/:skin.jpg', async (req, res) => {
             }
         });
 })
+
+app.get('/404', async (req, res) => {
+    res.status(404).send('')
+})
+
+app.get('/thumb.jpg', async (req, res) => {
+    res.contentType('image/jpeg')
+    res.send(fs.readFileSync('./assets/thumb.jpg'))
+})
+
+//404 handler
+app.get('*', function(req, res){
+    res.status(404).send('not found');
+});
 
 
 app.listen(143, () => {
