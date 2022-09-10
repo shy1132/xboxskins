@@ -19,7 +19,7 @@ app.get('/', (req, res) => {
 
 app.get('/rss/uxdash.php', (req, res) => {
     if(req.headers['x-forwarded-for'] !== '127.0.0.1'){
-        res.status(404).send('<rss></rss>')
+        return res.status(404).send('<rss></rss>')
     }
     fetch('https://archive.org/download/XBUXSkins')
     .then(res=>res.text())
