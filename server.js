@@ -30,6 +30,7 @@ function htmlEncode(str) {
 }
 
 async function updateIndexes(){
+    console.log('updating indexes')
     await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
         owner: 'whakama',
         repo: 'xboxskins-archive',
@@ -38,6 +39,7 @@ async function updateIndexes(){
         for (let i = 0; i < res.data.length; i++) {
             index.unleashx.push({name: res.data[i].name, download: res.data[i].download_url, id: i})
         }
+        console.log('finished updating indexes')
     })
 }
 
@@ -53,7 +55,13 @@ app.get('/', (req, res) => {
 });
 
 app.get('/rss/uxdash.php', (req, res) => {
-    console.log('request made from '+req.headers['x-forwarded-for'])
+    console.log({
+        req: 'ux_rss',
+        ip: req.headers['x-forwarded-for'],
+        time: Date.now(),
+        xbox: req.headers['user-agent']==='Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)'
+    })
+
     var items = [`<item>\n<title>!unofficial UnleashX skin servers (from archive.org/details/XBUXSkins)</title>\n<author> </author>\n<link>http://xbox-skins.net/404</link>\n<thumb>http://www.xbox-skins.net/thumb.jpg</thumb>\n</item>`]
 
     for (let i = 0; i < index.unleashx.length; i++) {
@@ -68,6 +76,13 @@ app.get('/rss/uxdash.php', (req, res) => {
 })
 
 app.get('/rss/uxdash.php/download/:skin.zip', async (req, res) => {
+    console.log({
+        req: 'ux_dl',
+        ip: req.headers['x-forwarded-for'],
+        time: Date.now(),
+        xbox: req.headers['user-agent']==='Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)'
+    })
+
     if (!req.params.skin) return res.status(404).send('')
 
     const id = parseInt(req.params.skin)
@@ -88,6 +103,13 @@ app.get('/rss/uxdash.php/download/:skin.zip', async (req, res) => {
 })
 
 app.get('/rss/uxdash.php/thumb/:skin.jpg', async (req, res) => {
+    console.log({
+        req: 'ux_thumb',
+        ip: req.headers['x-forwarded-for'],
+        time: Date.now(),
+        xbox: req.headers['user-agent']==='Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)'
+    })
+
     if (!req.params.skin) return res.status(404).send('')
 
     const id = parseInt(req.params.skin)
@@ -109,8 +131,7 @@ app.get('/rss/uxdash.php/thumb/:skin.jpg', async (req, res) => {
                                 })
                                 break;
                             } else if(i >= Object.values(zip.files).length-1){
-                                res.contentType("image/jpeg");
-                                res.send(fs.readFileSync('./assets/thumb.jpg'))
+                                res.status(404).send('')
                                 break;
                             }
                         }
@@ -137,6 +158,8 @@ app.get('*', function(req, res){
 });
 
 
-app.listen(143, () => {
-    console.log("listening on port 143");
+app.listen(745, () => {
+    console.log("listening on port 745");
 })
+
+console.log('starting')
