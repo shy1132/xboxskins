@@ -48,7 +48,8 @@ setInterval(updateIndexes, 21600000)
 //code
 
 app.get('/', (req, res) => {
-    res.send('there is no frontend for the website, only the backend servers for various xbox dashboards<br><br>i hope this is useful to anyone with those dashboards')
+    res.contentType('text/html')
+    res.send(fs.readFileSync('./public/index.html'))
 });
 
 app.get('/rss/uxdash.php', (req, res) => {
