@@ -4,8 +4,8 @@ process.on('uncaughtException', function(exception) {
 //requires
 const auth = require('./auth.json')
 const express = require('express')
-const fetch = require('node-fetch')
-const jsdom = require("jsdom");
+//const fetch = require('node-fetch')
+//const jsdom = require("jsdom");
 const fs = require('fs')
 const request = require('request')
 const AdmZip = require("adm-zip");
@@ -15,7 +15,7 @@ const octokit = new Octokit({ auth: auth.octokit });
 
 //setups
 const app = express()
-const { JSDOM } = jsdom;
+//const { JSDOM } = jsdom;
 app.set('trust proxy', true);
 app.disable('x-powered-by');
 
