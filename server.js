@@ -59,7 +59,7 @@ app.get('/rss/uxdash.php', (req, res) => {
         req: 'ux_rss',
         ip: req.headers['x-forwarded-for'],
         time: Date.now(),
-        xbox: req.headers['user-agent']==='Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)' ? true : req.headers['user-agent']
+        xbox: req.headers['user-agent'].startsWith('Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1') ? true : req.headers['user-agent']
     })
 
     var items = [`<item>\n<title>!! unofficial UnleashX skin servers (from archive.org/details/XBUXSkins)</title>\n<author> </author>\n<link>http://xbox-skins.net/404/this_is_not_a_skin</link>\n<thumb>http://www.xbox-skins.net/thumb.jpg</thumb>\n</item>`, `<item>\n<title>!!! be warned, there are some NSFW skins</title>\n<author> </author>\n<link>http://xbox-skins.net/404/this_is_not_a_skin</link>\n<thumb>http://www.xbox-skins.net/thumb.jpg</thumb>\n</item>`]
@@ -69,7 +69,7 @@ app.get('/rss/uxdash.php', (req, res) => {
         items.push(`<item>\n<title>${htmlEncode(file.name.slice(0, -4))}</title>\n<author> </author>\n<link>http://xbox-skins.net/rss/uxdash.php/download/${file.id}.zip</link>\n<thumb>http://www.xbox-skins.net/rss/uxdash.php/thumb/${encodeURIComponent(file.id)}.jpg</thumb>\n</item>`)
     }
 
-    var xml = `<?xml version='1.0'?>\n\n<!DOCTYPE rss PUBLIC "-//Netscape Communications//DTD RSS 0.91//E" "http://my.netscape.com/publish/formats/rss-0.91.dtd">\n\n<rss version="0.91">\n<channel>\n<title>UnleashX xbox-skins.net archive</title>\n<link>http://xbox-skins.net</link>\n<description></description>\n<language>en-us</language>\n${items.join('\n')}</channel>\n</rss>`
+    var xml = `<?xml version='1.0'?>\n\n<!DOCTYPE rss PUBLIC "-//Netscape Communications//DTD RSS 0.91//E" "http://my.netscape.com/publish/formats/rss-0.91.dtd">\n\n<rss version="0.91">\n<channel>\n<title>www.xbox-skins.net replacement server</title>\n<link>http://www.xbox-skins.net</link>\n<description></description>\n<language>en-us</language>\n${items.join('\n')}</channel>\n</rss>`
 
     res.contentType('text/xml')
     res.send(xml)
@@ -80,7 +80,7 @@ app.get('/rss/uxdash.php/download/:skin.zip', async (req, res) => {
         req: 'ux_dl',
         ip: req.headers['x-forwarded-for'],
         time: Date.now(),
-        xbox: req.headers['user-agent']==='Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)' ? true : req.headers['user-agent']
+        xbox: req.headers['user-agent'].startsWith('Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1') ? true : req.headers['user-agent']
     })
 
     if (!req.params.skin) return res.status(404).send('')
@@ -107,7 +107,7 @@ app.get('/rss/uxdash.php/thumb/:skin.jpg', async (req, res) => {
         req: 'ux_img',
         ip: req.headers['x-forwarded-for'],
         time: Date.now(),
-        xbox: req.headers['user-agent'] === 'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)' ? true : req.headers['user-agent']
+        xbox: req.headers['user-agent'].startsWith('Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1') ? true : req.headers['user-agent']
     })
 
     if (!req.params.skin) return res.status(404).send('')
@@ -123,13 +123,33 @@ app.get('/rss/uxdash.php/thumb/:skin.jpg', async (req, res) => {
             if (!err && resp.statusCode === 200) {
                 var zip = new AdmZip(buffer);
                 var zipfiles = zip.getEntries()
+                var valid = ['png', 'jpg', 'jpeg', 'bmp']
+                var convalid = ['jpg', 'jpeg']
+                var contenders = []
+
                 for (let i = 0; i < Object.values(zipfiles).length; i++) {
                     const entry = Object.values(zipfiles)[i]
-                    if (entry.entryName.endsWith('jpg') || entry.entryName.endsWith('jpeg')) {
-                        res.contentType('image/jpeg')
+                    const ename = entry.entryName.toLowerCase().split('/')[entry.entryName.toLowerCase().split('/').length-1]
+                    //console.log(ename)
+                    if((ename.startsWith('preview') || ename.startsWith('screenshot')) && valid.includes(ename.split('.')[ename.split('.').length-1])){
+                        //console.log('1')
+                        res.contentType('image/'+ename.split('.')[ename.split('.').length-1])
                         res.send(entry.getData())
                         break;
-                    } else if (i >= Object.values(zipfiles).length - 1) {
+                    } else if(convalid.includes(ename.split('.')[ename.split('.').length-1])){
+                        //console.log('2')
+                        contenders.push(entry)
+                    }
+
+                    if(i >= Object.values(zipfiles).length-1 && contenders.length > 0){
+                        //console.log('3')
+                        //console.log(contenders[0].entryName)
+                        var conename = contenders[0].entryName.toLowerCase().split('/')[contenders[0].entryName.toLowerCase().split('/').length-1]
+                        res.contentType('image/'+conename.split('.')[conename.split('.').length-1])
+                        res.send(contenders[0].getData())
+                        break;
+                    } else if(i >= Object.values(zipfiles).length-1){
+                        //console.log('4')
                         res.status(200).send('')
                         break;
                     }
