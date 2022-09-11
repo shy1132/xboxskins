@@ -130,12 +130,12 @@ app.get('/rss/uxdash.php/thumb/:skin.jpg', async (req, res) => {
                         res.send(entry.getData())
                         break;
                     } else if (i >= Object.values(zipfiles).length - 1) {
-                        res.status(404).send('')
+                        res.status(200).send('')
                         break;
                     }
                 }
             } else {
-                return res.status(404).send('')
+                return res.status(200).send('')
             }
         });
 })
