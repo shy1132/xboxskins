@@ -62,7 +62,7 @@ app.get('/rss/uxdash.php', (req, res) => {
         xbox: req.headers['user-agent']==='Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)' ? true : req.headers['user-agent']
     })
 
-    var items = [`<item>\n<title>!unofficial UnleashX skin servers (from archive.org/details/XBUXSkins)</title>\n<author> </author>\n<link>http://xbox-skins.net/404</link>\n<thumb>http://www.xbox-skins.net/thumb.jpg</thumb>\n</item>`]
+    var items = [`<item>\n<title>!! unofficial UnleashX skin servers (from archive.org/details/XBUXSkins)</title>\n<author> </author>\n<link>http://xbox-skins.net/404/this_is_not_a_skin</link>\n<thumb>http://www.xbox-skins.net/thumb.jpg</thumb>\n</item>`, `<item>\n<title>!!! be warned, there are some NSFW skins</title>\n<author> </author>\n<link>http://xbox-skins.net/404/this_is_not_a_skin</link>\n<thumb>http://www.xbox-skins.net/thumb.jpg</thumb>\n</item>`]
 
     for (let i = 0; i < index.unleashx.length; i++) {
         var file = index.unleashx[i]
@@ -104,7 +104,7 @@ app.get('/rss/uxdash.php/download/:skin.zip', async (req, res) => {
 
 app.get('/rss/uxdash.php/thumb/:skin.jpg', async (req, res) => {
     console.log({
-        req: 'ux_thumb',
+        req: 'ux_img',
         ip: req.headers['x-forwarded-for'],
         time: Date.now(),
         xbox: req.headers['user-agent'] === 'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)' ? true : req.headers['user-agent']
@@ -140,7 +140,7 @@ app.get('/rss/uxdash.php/thumb/:skin.jpg', async (req, res) => {
         });
 })
 
-app.get('/404', async (req, res) => {
+app.get('/404/:message', async (req, res) => { //unleashx will output :message due to it being the text after the last slash
     res.status(404).send('')
 })
 
