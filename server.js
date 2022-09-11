@@ -8,7 +8,7 @@ const fetch = require('node-fetch')
 const jsdom = require("jsdom");
 const fs = require('fs')
 const request = require('request')
-const JSZip = require("jszip");
+const AdmZip = require("adm-zip");
 const { Octokit } = require('octokit')
 const octokit = new Octokit({ auth: auth.octokit });
 
@@ -59,7 +59,7 @@ app.get('/rss/uxdash.php', (req, res) => {
         req: 'ux_rss',
         ip: req.headers['x-forwarded-for'],
         time: Date.now(),
-        xbox: req.headers['user-agent']==='Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)'
+        xbox: req.headers['user-agent']==='Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)' ? true : req.headers['user-agent']
     })
 
     var items = [`<item>\n<title>!unofficial UnleashX skin servers (from archive.org/details/XBUXSkins)</title>\n<author> </author>\n<link>http://xbox-skins.net/404</link>\n<thumb>http://www.xbox-skins.net/thumb.jpg</thumb>\n</item>`]
@@ -77,10 +77,10 @@ app.get('/rss/uxdash.php', (req, res) => {
 
 app.get('/rss/uxdash.php/download/:skin.zip', async (req, res) => {
     console.log({
-        req: 'ux_dl',
+        req: 'ux_rss',
         ip: req.headers['x-forwarded-for'],
         time: Date.now(),
-        xbox: req.headers['user-agent']==='Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)'
+        xbox: req.headers['user-agent']==='Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)' ? true : req.headers['user-agent']
     })
 
     if (!req.params.skin) return res.status(404).send('')
@@ -104,10 +104,10 @@ app.get('/rss/uxdash.php/download/:skin.zip', async (req, res) => {
 
 app.get('/rss/uxdash.php/thumb/:skin.jpg', async (req, res) => {
     console.log({
-        req: 'ux_thumb',
+        req: 'ux_rss',
         ip: req.headers['x-forwarded-for'],
         time: Date.now(),
-        xbox: req.headers['user-agent']==='Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)'
+        xbox: req.headers['user-agent'] === 'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)' ? true : req.headers['user-agent']
     })
 
     if (!req.params.skin) return res.status(404).send('')
@@ -121,22 +121,19 @@ app.get('/rss/uxdash.php/thumb/:skin.jpg', async (req, res) => {
         },
         (err, resp, buffer) => {
             if (!err && resp.statusCode === 200) {
-                    JSZip.loadAsync(buffer).then(function (zip) {
-                        for (let i = 0; i < Object.values(zip.files).length; i++) {
-                            const entry = Object.values(zip.files)[i]
-                            if(entry.name.endsWith('jpg') || entry.name.endsWith('jpeg')){
-                                zip.file(entry.name).async('nodebuffer').then(data=>{
-                                    res.contentType('image/jpeg')
-                                    res.send(data)
-                                })
-                                break;
-                            } else if(i >= Object.values(zip.files).length-1){
-                                res.status(404).send('')
-                                break;
-                            }
-                        }
-            
-                    });
+                var zip = new AdmZip(buffer);
+                var zipfiles = zip.getEntries()
+                for (let i = 0; i < Object.values(zipfiles).length; i++) {
+                    const entry = Object.values(zipfiles)[i]
+                    if (entry.entryName.endsWith('jpg') || entry.entryName.endsWith('jpeg')) {
+                        res.contentType('image/jpeg')
+                        res.send(entry.getData())
+                        break;
+                    } else if (i >= Object.values(zipfiles).length - 1) {
+                        res.status(404).send('')
+                        break;
+                    }
+                }
             } else {
                 return res.status(404).send('')
             }
