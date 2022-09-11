@@ -96,9 +96,7 @@ app.get('/rss/uxdash.php/download/:skin.zip', async (req, res) => {
             if (!err && resp.statusCode === 200) {
                 res.contentType('application/zip');
                 res.send(resp.body);
-                resp = null
             } else {
-                resp = null
                 res.status(404).send('')
             }
         });
@@ -130,16 +128,13 @@ app.get('/rss/uxdash.php/thumb/:skin.jpg', async (req, res) => {
                     if (entry.entryName.endsWith('jpg') || entry.entryName.endsWith('jpeg')) {
                         res.contentType('image/jpeg')
                         res.send(entry.getData())
-                        buffer = null
                         break;
                     } else if (i >= Object.values(zipfiles).length - 1) {
                         res.status(200).send('')
-                        buffer = null
                         break;
                     }
                 }
             } else {
-                buffer = null
                 res.status(200).send('')
             }
         });
