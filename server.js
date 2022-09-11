@@ -77,7 +77,7 @@ app.get('/rss/uxdash.php', (req, res) => {
 
 app.get('/rss/uxdash.php/download/:skin.zip', async (req, res) => {
     console.log({
-        req: 'ux_rss',
+        req: 'ux_dl',
         ip: req.headers['x-forwarded-for'],
         time: Date.now(),
         xbox: req.headers['user-agent']==='Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)' ? true : req.headers['user-agent']
@@ -86,7 +86,7 @@ app.get('/rss/uxdash.php/download/:skin.zip', async (req, res) => {
     if (!req.params.skin) return res.status(404).send('')
 
     const id = parseInt(req.params.skin)
-    if (id > index.unleashx.length - 1 || id < 0) return res.status(404).send('')
+    if (id > index.unleashx.length - 1 || id < 0 || isNaN(id)) return res.status(404).send('')
 
     request({
             url: index.unleashx[id].download,
@@ -104,7 +104,7 @@ app.get('/rss/uxdash.php/download/:skin.zip', async (req, res) => {
 
 app.get('/rss/uxdash.php/thumb/:skin.jpg', async (req, res) => {
     console.log({
-        req: 'ux_rss',
+        req: 'ux_thumb',
         ip: req.headers['x-forwarded-for'],
         time: Date.now(),
         xbox: req.headers['user-agent'] === 'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)' ? true : req.headers['user-agent']
