@@ -51,7 +51,6 @@ async function updateIndexes(){
         repo: 'xboxskins-archive',
         tree_sha: unsha
     }).then(res=>{
-        fs.writeFileSync('./test.json', JSON.stringify(res))
         console.log('files fetched')
         for (let i = 0; i < res.data.tree.length; i++) {
             var name = res.data.tree[i].path.split('/').pop()
