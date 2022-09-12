@@ -31,13 +31,31 @@ function htmlEncode(str) {
 
 async function updateIndexes(){
     console.log('updating indexes')
-    await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
+    console.log('fetching tree sha')
+    var rootsha;
+    await octokit.request('HEAD /repos/whakama/xboxskins-archive/contents/').then(res=>{return rootsha = res.headers.etag.split('W/"')[1].split('"')[0]})
+    console.log('root sha obtained ['+rootsha+']')
+    console.log('fetching unleashx tree sha')
+    var unsha;
+    await octokit.request('GET /repos/whakama/xboxskins-archive/git/trees/'+rootsha).then(res=>{
+        for (let i = 0; i < res.data.tree.length; i++) {
+            if(res.data.tree[i].path === 'unleashx'){
+                return unsha = res.data.tree[i].sha
+            }
+        }
+    })
+    console.log('unleashx sha obtained ['+unsha+']')
+    console.log('fetching files')
+    await octokit.request('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', {
         owner: 'whakama',
         repo: 'xboxskins-archive',
-        path: '/unleashx'
+        tree_sha: unsha
     }).then(res=>{
-        for (let i = 0; i < res.data.length; i++) {
-            index.unleashx.push({name: res.data[i].name, download: res.data[i].download_url, id: i})
+        fs.writeFileSync('./test.json', JSON.stringify(res))
+        console.log('files fetched')
+        for (let i = 0; i < res.data.tree.length; i++) {
+            var name = res.data.tree[i].path.split('/').pop()
+            index.unleashx.push({name, download: `https://raw.githubusercontent.com/whakama/xboxskins-archive/main/unleashx/${encodeURIComponent(name)}`, id: i})
         }
         console.log('finished updating indexes')
     })
@@ -62,11 +80,11 @@ app.get('/rss/uxdash.php', (req, res) => {
         xbox: req.headers['user-agent'].startsWith('Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1') ? true : req.headers['user-agent']
     })
 
-    var items = [`<item>\n<title>!! unofficial UnleashX skin servers (from archive.org/details/XBUXSkins)</title>\n<author> </author>\n<link>http://xbox-skins.net/404/this_is_not_a_skin</link>\n<thumb>http://www.xbox-skins.net/thumb.jpg</thumb>\n</item>`, `<item>\n<title>!!! be warned, there are some NSFW skins</title>\n<author> </author>\n<link>http://xbox-skins.net/404/this_is_not_a_skin</link>\n<thumb>http://www.xbox-skins.net/thumb.jpg</thumb>\n</item>`]
+    var items = [`<item>\n<title>!! unofficial UnleashX skin servers (from archive.org/details/XBUXSkins)</title>\n<author> </author>\n<link>http://www.xbox-skins.net/404/this_is_not_a_skin</link>\n<thumb>http://www.xbox-skins.net/thumb.jpg</thumb>\n</item>`, `<item>\n<title>!!! be warned, there are some NSFW skins</title>\n<author> </author>\n<link>http://www.xbox-skins.net/404/this_is_not_a_skin</link>\n<thumb>http://www.xbox-skins.net/thumb.jpg</thumb>\n</item>`]
 
     for (let i = 0; i < index.unleashx.length; i++) {
         var file = index.unleashx[i]
-        items.push(`<item>\n<title>${htmlEncode(file.name.slice(0, -4))}</title>\n<author> </author>\n<link>http://xbox-skins.net/rss/uxdash.php/download/${file.id}.zip</link>\n<thumb>http://www.xbox-skins.net/rss/uxdash.php/thumb/${encodeURIComponent(file.id)}.jpg</thumb>\n</item>`)
+        items.push(`<item>\n<title>${htmlEncode(file.name.slice(0, -4))}</title>\n<author> </author>\n<link>http://www.xbox-skins.net/uxdash/download/${file.id}.zip</link>\n<thumb>http://www.xbox-skins.net/uxdash/thumb/${encodeURIComponent(file.id)}.jpg</thumb>\n</item>`)
     }
 
     var xml = `<?xml version='1.0'?>\n\n<!DOCTYPE rss PUBLIC "-//Netscape Communications//DTD RSS 0.91//E" "http://my.netscape.com/publish/formats/rss-0.91.dtd">\n\n<rss version="0.91">\n<channel>\n<title>www.xbox-skins.net replacement server</title>\n<link>http://www.xbox-skins.net</link>\n<description></description>\n<language>en-us</language>\n${items.join('\n')}</channel>\n</rss>`
@@ -75,7 +93,7 @@ app.get('/rss/uxdash.php', (req, res) => {
     res.send(xml)
 })
 
-app.get('/rss/uxdash.php/download/:skin.zip', async (req, res) => {
+app.get('/uxdash/download/:skin.zip', async (req, res) => {
     console.log({
         req: 'ux_dl',
         ip: req.headers['x-forwarded-for'],
@@ -102,7 +120,7 @@ app.get('/rss/uxdash.php/download/:skin.zip', async (req, res) => {
         });
 })
 
-app.get('/rss/uxdash.php/thumb/:skin.jpg', async (req, res) => {
+app.get('/uxdash/thumb/:skin.jpg', async (req, res) => {
     console.log({
         req: 'ux_img',
         ip: req.headers['x-forwarded-for'],
