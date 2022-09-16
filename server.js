@@ -31,6 +31,7 @@ function htmlEncode(str) {
 
 async function updateIndexes(){
     console.log('updating indexes')
+    index.unleashx = []
     console.log('fetching tree sha')
     var rootsha;
     await octokit.request('HEAD /repos/whakama/xboxskins-archive/contents/').then(res=>{return rootsha = res.headers.etag.split('W/"')[1].split('"')[0]})
