@@ -72,6 +72,11 @@ app.get('/', (req, res) => {
     res.send(fs.readFileSync('./public/index.html'))
 });
 
+app.get('/robots.txt', (req, res) => {
+    res.contentType('text/plain')
+    res.send(fs.readFileSync('./public/robots.txt'))
+});
+
 app.get('/rss/uxdash.php', (req, res) => {
     console.log({
         req: 'ux_rss',
