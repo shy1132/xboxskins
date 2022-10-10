@@ -80,17 +80,22 @@ app.get('/robots.txt', (req, res) => {
 app.get('/rss/uxdash.php', (req, res) => {
     console.log({
         req: 'ux_rss',
-        ip: req.headers['x-forwarded-for'],
+        ip: req.headers['x-forwarded-for'].split(',')[req.headers['x-forwarded-for'].split(',').length-1].trim(),
         time: Date.now(),
         xbox: req.headers['user-agent'].startsWith('Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1') ? true : req.headers['user-agent']
     })
 
-    var items = [`<item>\n<title>!! unofficial UnleashX skin servers (from archive.org/details/XBUXSkins)</title>\n<author> </author>\n<link>http://www.xbox-skins.net/404/this_is_not_a_skin</link>\n<thumb>http://www.xbox-skins.net/thumb.jpg</thumb>\n</item>`, `<item>\n<title>!!! be warned, there are some NSFW skins</title>\n<author> </author>\n<link>http://www.xbox-skins.net/404/this_is_not_a_skin</link>\n<thumb>http://www.xbox-skins.net/thumb.jpg</thumb>\n</item>`]
-
+    var items = [`<item>\n<title>! unofficial UnleashX skin server (from archive.org/details/XBUXSkins)</title>\n<link>http://www.xbox-skins.net/404/this_is_not_a_skin</link>\n<thumb>http://www.xbox-skins.net/thumb.jpg</thumb>\n</item>`, `<item>\n<title>!! all NSFW skins at bottom</title>\n<link>http://www.xbox-skins.net/404/this_is_not_a_skin</link>\n<thumb>http://www.xbox-skins.net/thumb.jpg</thumb>\n</item>`, `<item>\n<title>!!! ------------------------------------------------------------------------------------------- !!!</title>\n<link>http://www.xbox-skins.net/404/this_is_not_a_skin</link>\n<thumb>http://www.xbox-skins.net/thumb.jpg</thumb>\n</item>`]
+    var nsfwitems = []
     for (let i = 0; i < index.unleashx.length; i++) {
         var file = index.unleashx[i]
-        items.push(`<item>\n<title>${htmlEncode(file.name.slice(0, -4))}</title>\n<author> </author>\n<link>http://www.xbox-skins.net/uxdash/download/${file.id}.zip</link>\n<thumb>http://www.xbox-skins.net/uxdash/thumb/${encodeURIComponent(file.id)}.jpg</thumb>\n</item>`)
+        if(file.name.includes('[NSFW]')) {
+            nsfwitems.push(`<item>\n<title>~${htmlEncode(file.name.slice(0, -4))}</title>\n<link>http://www.xbox-skins.net/uxdash/download/${file.id}.zip</link>\n<thumb>http://www.xbox-skins.net/uxdash/thumb/${encodeURIComponent(file.id)}.jpg</thumb>\n</item>`)
+        } else {
+            items.push(`<item>\n<title>${htmlEncode(file.name.slice(0, -4))}</title>\n<link>http://www.xbox-skins.net/uxdash/download/${file.id}.zip</link>\n<thumb>http://www.xbox-skins.net/uxdash/thumb/${encodeURIComponent(file.id)}.jpg</thumb>\n</item>`)
+        }
     }
+    items = items.concat(nsfwitems)
 
     var xml = `<?xml version='1.0'?>\n\n<!DOCTYPE rss PUBLIC "-//Netscape Communications//DTD RSS 0.91//E" "http://my.netscape.com/publish/formats/rss-0.91.dtd">\n\n<rss version="0.91">\n<channel>\n<title>www.xbox-skins.net replacement server</title>\n<link>http://www.xbox-skins.net</link>\n<description></description>\n<language>en-us</language>\n${items.join('\n')}</channel>\n</rss>`
 
@@ -101,7 +106,7 @@ app.get('/rss/uxdash.php', (req, res) => {
 app.get('/uxdash/download/:skin.zip', async (req, res) => {
     console.log({
         req: 'ux_dl',
-        ip: req.headers['x-forwarded-for'],
+        ip: req.headers['x-forwarded-for'].split(',')[req.headers['x-forwarded-for'].split(',').length-1].trim(),
         time: Date.now(),
         xbox: req.headers['user-agent'].startsWith('Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1') ? true : req.headers['user-agent']
     })
@@ -128,7 +133,7 @@ app.get('/uxdash/download/:skin.zip', async (req, res) => {
 app.get('/uxdash/thumb/:skin.jpg', async (req, res) => {
     console.log({
         req: 'ux_img',
-        ip: req.headers['x-forwarded-for'],
+        ip: req.headers['x-forwarded-for'].split(',')[req.headers['x-forwarded-for'].split(',').length-1].trim(),
         time: Date.now(),
         xbox: req.headers['user-agent'].startsWith('Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1') ? true : req.headers['user-agent']
     })
@@ -194,7 +199,7 @@ app.get('/thumb.jpg', async (req, res) => {
 
 //404 handler
 app.get('*', function(req, res){
-    res.status(404).send('not found');
+    res.status(404).send('')
 });
 
 
