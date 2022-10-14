@@ -197,11 +197,6 @@ app.get('/404/:message', async (req, res) => { //unleashx will output :message d
     res.status(404).send('')
 })
 
-app.get('/thumb.jpg', async (req, res) => {
-    res.contentType('image/jpeg')
-    res.send(fs.readFileSync('./assets/thumb.jpg'))
-})
-
 //404 handler
 app.get('*', function(req, res){
     res.status(404).send('')
