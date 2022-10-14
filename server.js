@@ -29,6 +29,16 @@ function htmlEncode(str) {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function uxEntry(title, link, thumb){
+    return `<item><title>${title}</title><link>${link}</link><thumb>${thumb}</thumb></item>`
+}
+
+function parseForwarded(header){
+    if(header && header.split(',')[header.split(',').length-1]) {
+        return header.split(',')[header.split(',').length-1].trim()
+    } else return null
+}
+
 async function updateIndexes(){
     console.log('updating indexes')
     index.unleashx = []
@@ -66,39 +76,34 @@ setInterval(updateIndexes, 21600000)
 
 
 //code
-
-app.get('/', (req, res) => {
-    res.contentType('text/html')
-    res.send(fs.readFileSync('./public/index.html'))
-});
-
-app.get('/robots.txt', (req, res) => {
-    res.contentType('text/plain')
-    res.send(fs.readFileSync('./public/robots.txt'))
-});
+app.use(express.static('public'))
 
 app.get('/rss/uxdash.php', (req, res) => {
     console.log({
         req: 'ux_rss',
-        ip: req.headers['x-forwarded-for'].split(',')[req.headers['x-forwarded-for'].split(',').length-1].trim(),
+        ip: parseForwarded(req.headers['x-forwarded-for']),
         time: Date.now(),
         xbox: req.headers['user-agent'].startsWith('Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1') ? true : req.headers['user-agent']
     })
 
-    var items = [`<item>\n<title>! unofficial UnleashX skin server (from archive.org/details/XBUXSkins)</title>\n<link>http://www.xbox-skins.net/404/this_is_not_a_skin</link>\n<thumb>http://www.xbox-skins.net/thumb.jpg</thumb>\n</item>`, `<item>\n<title>!! all NSFW skins at bottom</title>\n<link>http://www.xbox-skins.net/404/this_is_not_a_skin</link>\n<thumb>http://www.xbox-skins.net/thumb.jpg</thumb>\n</item>`, `<item>\n<title>!!! ------------------------------------------------------------------------------------------- !!!</title>\n<link>http://www.xbox-skins.net/404/this_is_not_a_skin</link>\n<thumb>http://www.xbox-skins.net/thumb.jpg</thumb>\n</item>`]
+    var items = [
+        uxEntry('! unofficial UnleashX skin server (sorted from archive.org/details/XBUXSkins)', 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg'),
+        uxEntry('!! all NSFW skins at bottom', 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg'),
+        uxEntry('!!! ------------------------------------------------------------------------------------------- !!!', 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg')
+    ]
     var nsfwitems = []
+
     for (let i = 0; i < index.unleashx.length; i++) {
         var file = index.unleashx[i]
         if(file.name.includes('[NSFW]')) {
-            nsfwitems.push(`<item>\n<title>~${htmlEncode(file.name.slice(0, -4))}</title>\n<link>http://www.xbox-skins.net/uxdash/download/${file.id}.zip</link>\n<thumb>http://www.xbox-skins.net/uxdash/thumb/${encodeURIComponent(file.id)}.jpg</thumb>\n</item>`)
+            nsfwitems.push(uxEntry(`~${htmlEncode(file.name.slice(0, -4))}`, `http://www.xbox-skins.net/uxdash/download/${file.id}.zip`, `http://www.xbox-skins.net/uxdash/thumb/${encodeURIComponent(file.id)}.jpg`))
         } else {
-            items.push(`<item>\n<title>${htmlEncode(file.name.slice(0, -4))}</title>\n<link>http://www.xbox-skins.net/uxdash/download/${file.id}.zip</link>\n<thumb>http://www.xbox-skins.net/uxdash/thumb/${encodeURIComponent(file.id)}.jpg</thumb>\n</item>`)
+            items.push(uxEntry(`${htmlEncode(file.name.slice(0, -4))}`, `http://www.xbox-skins.net/uxdash/download/${file.id}.zip`, `http://www.xbox-skins.net/uxdash/thumb/${encodeURIComponent(file.id)}.jpg`))
         }
     }
     items = items.concat(nsfwitems)
 
-    var xml = `<?xml version='1.0'?>\n\n<!DOCTYPE rss PUBLIC "-//Netscape Communications//DTD RSS 0.91//E" "http://my.netscape.com/publish/formats/rss-0.91.dtd">\n\n<rss version="0.91">\n<channel>\n<title>www.xbox-skins.net replacement server</title>\n<link>http://www.xbox-skins.net</link>\n<description></description>\n<language>en-us</language>\n${items.join('\n')}</channel>\n</rss>`
-
+    var xml = `<?xml version='1.0'?><!DOCTYPE rss PUBLIC "-//Netscape Communications//DTD RSS 0.91//E" "http://my.netscape.com/publish/formats/rss-0.91.dtd"><rss version="0.91"><channel><title>www.xbox-skins.net replacement server</title><link>http://www.xbox-skins.net</link><language>en-us</language>${items.join('')}</channel></rss>`
     res.contentType('text/xml')
     res.send(xml)
 })
@@ -106,7 +111,7 @@ app.get('/rss/uxdash.php', (req, res) => {
 app.get('/uxdash/download/:skin.zip', async (req, res) => {
     console.log({
         req: 'ux_dl',
-        ip: req.headers['x-forwarded-for'].split(',')[req.headers['x-forwarded-for'].split(',').length-1].trim(),
+        ip: parseForwarded(req.headers['x-forwarded-for']),
         time: Date.now(),
         xbox: req.headers['user-agent'].startsWith('Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1') ? true : req.headers['user-agent']
     })
@@ -133,7 +138,7 @@ app.get('/uxdash/download/:skin.zip', async (req, res) => {
 app.get('/uxdash/thumb/:skin.jpg', async (req, res) => {
     console.log({
         req: 'ux_img',
-        ip: req.headers['x-forwarded-for'].split(',')[req.headers['x-forwarded-for'].split(',').length-1].trim(),
+        ip: parseForwarded(req.headers['x-forwarded-for']),
         time: Date.now(),
         xbox: req.headers['user-agent'].startsWith('Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1') ? true : req.headers['user-agent']
     })
