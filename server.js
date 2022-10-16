@@ -9,12 +9,12 @@ const express = require('express')
 //const jsdom = require("jsdom");
 //const fs = require('fs')
 const request = require('request')
-const AdmZip = require("adm-zip");
+const AdmZip = require('adm-zip')
 const { Octokit } = require('octokit')
-const octokit = new Octokit({ auth: auth.octokit });
 
 
 //setups
+const octokit = new Octokit({ auth: auth.octokit });
 const app = express()
 //const { JSDOM } = jsdom;
 app.set('trust proxy', true);
@@ -77,7 +77,7 @@ setInterval(updateIndexes, 21600000)
 
 
 //code
-app.get('/rss/uxdash.php', (req, res) => {
+app.get('/rss/uxdash.php', async (req, res) => { //this has nothing to do with php but the original website used php
     console.log({
         req: 'ux_rss',
         ip: parseForwarded(req.headers['x-forwarded-for']),
@@ -192,12 +192,12 @@ app.get('/uxdash/thumb/:skin.jpg', async (req, res) => {
         });
 })
 
-app.get('/404/:message', async (req, res) => { //unleashx will output :message due to it being the text after the last slash
+app.get('/404/:message', (req, res) => { //unleashx will output :message due to it being the text after the last slash
     res.status(404).send('')
 })
 
 //404 handler
-app.get('*', function(req, res){
+app.get('*', (req, res)=>{
     res.status(404).send('')
 });
 
