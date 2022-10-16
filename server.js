@@ -1,12 +1,13 @@
 process.on('uncaughtException', function(exception) {
     console.log(exception.stack)
 });
+
 //requires
 const auth = require('./auth.json')
 const express = require('express')
 //const fetch = require('node-fetch')
 //const jsdom = require("jsdom");
-const fs = require('fs')
+//const fs = require('fs')
 const request = require('request')
 const AdmZip = require("adm-zip");
 const { Octokit } = require('octokit')
@@ -17,6 +18,7 @@ const octokit = new Octokit({ auth: auth.octokit });
 const app = express()
 //const { JSDOM } = jsdom;
 app.set('trust proxy', true);
+app.use(express.static('public'));
 app.disable('x-powered-by');
 
 //variables
@@ -43,8 +45,7 @@ async function updateIndexes(){
     console.log('updating indexes')
     index.unleashx = []
     console.log('fetching tree sha')
-    var rootsha;
-    await octokit.request('HEAD /repos/whakama/xboxskins-archive/contents/').then(res=>{return rootsha = res.headers.etag.split('W/"')[1].split('"')[0]})
+    var rootsha = await (await octokit.request('HEAD /repos/whakama/xboxskins-archive/contents/')).headers.etag.split('W/"')[1].split('"')[0]
     console.log('root sha obtained ['+rootsha+']')
     console.log('fetching unleashx tree sha')
     var unsha;
@@ -76,8 +77,6 @@ setInterval(updateIndexes, 21600000)
 
 
 //code
-app.use(express.static('public'))
-
 app.get('/rss/uxdash.php', (req, res) => {
     console.log({
         req: 'ux_rss',
