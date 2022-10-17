@@ -292,7 +292,7 @@ app.get('/404/:message', (req, res) => { //unleashx will output :message due to 
     res.status(404).send('')
 })
 
-app.get('*', (req, res) => { //since its after everything it just 404s shit that isnt in this file/public dir
+app.all('*', (req, res) => { //since its after everything it just 404s shit that isnt in this file/public dir
     res.status(404).send('')
 });
 
