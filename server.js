@@ -266,6 +266,8 @@ app.get('/games/sendvid.php', async (req, res) => {
     if(parseUa(req.headers['user-agent']) === undefined) return res.redirect(req.url)
 
     var sid = parseInt(req.query.sid)-1
+    if(isNaN(sid)) return res.status(404).send('')
+    if(!prindex.unleashx[sid]) return res.status(404).send('')
     
     request({
             url: `https://raw.githubusercontent.com/whakama/xbox-previews-archive/main/${encodeURIComponent(prindex.unleashx[sid])}`,
