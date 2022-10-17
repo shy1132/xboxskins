@@ -120,7 +120,7 @@ app.get('/rss/uxdash.php', async (req, res) => { //this has nothing to do with p
 
     var items = [
         uxEntry('! unofficial UnleashX skin server (sorted from archive.org/details/XBUXSkins)', 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg'),
-        uxEntry('!! all NSFW skins at bottom', 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg'),
+        uxEntry('!! see www.xbox-skins.net in your browser for more information', 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg'),
         uxEntry('!!! ------------------------------------------------------------------------------------------- !!!', 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg')
     ]
     var nsfwitems = []
