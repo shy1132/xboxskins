@@ -268,7 +268,7 @@ app.get('/games/sendvid.php', async (req, res) => {
     var sid = parseInt(req.query.sid)-1
     
     request({
-            url: `https://raw.githubusercontent.com/whakama/xbox-previews-archive/main//${encodeURIComponent(prindex.unleashx[sid])}`,
+            url: `https://raw.githubusercontent.com/whakama/xbox-previews-archive/main/${encodeURIComponent(prindex.unleashx[sid])}`,
             encoding: null
         },
         (err, resp, buffer) => {
