@@ -75,11 +75,11 @@ async function updateSkinIndexes(){
     console.log('updating skin indexes')
     skindex.unleashx = []
     //console.log('fetching tree sha')
-    var rootsha = await (await octokit.request('HEAD /repos/whakama/xboxskins-archive/contents/')).headers.etag.split('W/"')[1].split('"')[0]
+    var rootsha = await (await octokit.request('HEAD /repos/whakama/xbox-skins-archive/contents/')).headers.etag.split('W/"')[1].split('"')[0]
     //console.log('root sha obtained ['+rootsha+']')
     //console.log('fetching unleashx tree sha')
     var unsha;
-    await octokit.request('GET /repos/whakama/xboxskins-archive/git/trees/'+rootsha).then(res=>{
+    await octokit.request('GET /repos/whakama/xbox-skins-archive/git/trees/'+rootsha).then(res=>{
         for (let i = 0; i < res.data.tree.length; i++) {
             if(res.data.tree[i].path === 'unleashx'){
                 return unsha = res.data.tree[i].sha
@@ -90,13 +90,13 @@ async function updateSkinIndexes(){
     //console.log('fetching files')
     await octokit.request('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', {
         owner: 'whakama',
-        repo: 'xboxskins-archive',
+        repo: 'xbox-skins-archive',
         tree_sha: unsha
     }).then(res=>{
         //console.log('files fetched')
         for (let i = 0; i < res.data.tree.length; i++) {
             var name = res.data.tree[i].path.split('/').pop()
-            skindex.unleashx.push({name, download: `https://raw.githubusercontent.com/whakama/xboxskins-archive/main/unleashx/${encodeURIComponent(name)}`, id: i})
+            skindex.unleashx.push({name, download: `https://raw.githubusercontent.com/whakama/xbox-skins-archive/main/unleashx/${encodeURIComponent(name)}`, id: i})
         }
         console.log('finished updating skin indexes')
     })
