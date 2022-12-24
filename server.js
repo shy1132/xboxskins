@@ -3,21 +3,21 @@ process.on('uncaughtException', function(exception) {
 });
 
 //requires
-const auth = require('./auth.json')
 const express = require('express')
-//const fetch = require('node-fetch')
-//const jsdom = require('jsdom')
-//const fs = require('fs')
-const request = require('request')
+const fetch = require('node-fetch')
 const AdmZip = require('adm-zip')
 const { Octokit } = require('octokit')
+const auth = require('./auth.json')
 const tiddb = require('./files/tiddb.json')
 
 
 //setups
-const octokit = new Octokit({ auth: auth.octokit });
+const octokit = new Octokit({
+    auth: auth.octokit
+});
+
 const app = express()
-//const { JSDOM } = jsdom;
+
 app.set('trust proxy', true);
 app.use(express.static('public'));
 app.disable('x-powered-by');
@@ -36,23 +36,23 @@ function htmlEncode(str) {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function uxEntry(title, link, thumb){
+function uxEntry(title, link, thumb) {
     return `<item><title>${title}</title><link>${link}</link><thumb>${thumb}</thumb></item>`
 }
 
-function parseForwarded(header){
-    if(header && header.split(',')[header.split(',').length-1]) {
-        return header.split(',')[header.split(',').length-1].trim()
+function parseForwarded(header) {
+    if (header && header.split(',')[header.split(',').length - 1]) {
+        return header.split(',')[header.split(',').length - 1].trim()
     } else return null
 }
 
-function parseUa(header){
-    if(header && header.startsWith('Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1')) {
+function parseUa(header) {
+    if (header && header.startsWith('Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1')) {
         return true
     } else return header
 }
 
-async function updatePreviewIndexes(){
+async function updatePreviewIndexes() {
     console.log('updating preview indexes')
     prindex.unleashx = []
     //console.log('fetching tree sha')
@@ -61,7 +61,7 @@ async function updatePreviewIndexes(){
         owner: 'whakama',
         repo: 'xbox-previews-archive',
         tree_sha: rootsha
-    }).then(res=>{
+    }).then(res => {
         //console.log('files fetched')
         for (let i = 0; i < res.data.tree.length; i++) {
             var wmv = res.data.tree[i].path.split('/').pop()
@@ -71,7 +71,7 @@ async function updatePreviewIndexes(){
     })
 }
 
-async function updateSkinIndexes(){
+async function updateSkinIndexes() {
     console.log('updating skin indexes')
     skindex.unleashx = []
     //console.log('fetching tree sha')
@@ -79,9 +79,9 @@ async function updateSkinIndexes(){
     //console.log('root sha obtained ['+rootsha+']')
     //console.log('fetching unleashx tree sha')
     var unsha;
-    await octokit.request('GET /repos/whakama/xbox-skins-archive/git/trees/'+rootsha).then(res=>{
+    await octokit.request('GET /repos/whakama/xbox-skins-archive/git/trees/' + rootsha).then(res => {
         for (let i = 0; i < res.data.tree.length; i++) {
-            if(res.data.tree[i].path === 'unleashx'){
+            if (res.data.tree[i].path === 'unleashx') {
                 return unsha = res.data.tree[i].sha
             }
         }
@@ -92,11 +92,15 @@ async function updateSkinIndexes(){
         owner: 'whakama',
         repo: 'xbox-skins-archive',
         tree_sha: unsha
-    }).then(res=>{
+    }).then(res => {
         //console.log('files fetched')
         for (let i = 0; i < res.data.tree.length; i++) {
             var name = res.data.tree[i].path.split('/').pop()
-            skindex.unleashx.push({name, download: `https://raw.githubusercontent.com/whakama/xbox-skins-archive/main/unleashx/${encodeURIComponent(name)}`, id: i})
+            skindex.unleashx.push({
+                name,
+                download: `https://raw.githubusercontent.com/whakama/xbox-skins-archive/main/unleashx/${encodeURIComponent(name)}`,
+                id: i
+            })
         }
         console.log('finished updating skin indexes')
     })
@@ -127,7 +131,7 @@ app.get('/rss/uxdash.php', async (req, res) => { //this has nothing to do with p
 
     for (let i = 0; i < skindex.unleashx.length; i++) {
         var file = skindex.unleashx[i]
-        if(file.name.includes('[NSFW]')) {
+        if (file.name.includes('[NSFW]')) {
             nsfwitems.push(uxEntry(`~${htmlEncode(file.name.slice(0, -4))}`, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/thumbs/${encodeURIComponent(file.id)}.jpg`))
         } else {
             items.push(uxEntry(`${htmlEncode(file.name.slice(0, -4))}`, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/thumbs/${encodeURIComponent(file.id)}.jpg`))
@@ -153,18 +157,13 @@ app.get('/downloads/skins/:skin.zip', async (req, res) => {
     const id = parseInt(req.params.skin)
     if (id > skindex.unleashx.length - 1 || id < 0 || isNaN(id)) return res.status(404).send('')
 
-    request({
-            url: skindex.unleashx[id].download,
-            encoding: null
-        },
-        (err, resp, buffer) => {
-            if (!err && resp.statusCode === 200) {
-                res.contentType('application/zip');
-                res.send(resp.body);
-            } else {
-                res.status(404).send('')
-            }
-        });
+    var response = await fetch(skindex.unleashx[id].download)
+    if (!response.ok) return res.status(404).send('')
+
+    var buffer = await response.buffer()
+
+    res.contentType('application/zip')
+    res.send(buffer)
 })
 
 app.get('/downloads/thumbs/:skin.jpg', async (req, res) => {
@@ -180,49 +179,43 @@ app.get('/downloads/thumbs/:skin.jpg', async (req, res) => {
     const id = parseInt(req.params.skin)
     if (id > skindex.unleashx.length - 1 || id < 0 || isNaN(id)) return res.status(404).send('')
 
-    request({
-            url: skindex.unleashx[id].download,
-            encoding: null
-        },
-        (err, resp, buffer) => {
-            if (!err && resp.statusCode === 200) {
-                var zip = new AdmZip(buffer);
-                var zipfiles = zip.getEntries()
-                var valid = ['png', 'jpg', 'jpeg', 'bmp']
-                var convalid = ['jpg', 'jpeg']
-                var contenders = []
+    var response = await fetch(skindex.unleashx[id].download)
+    if (!response.ok) return res.status(200).send('') //200 because it breaks otherwise
 
-                for (let i = 0; i < Object.values(zipfiles).length; i++) {
-                    const entry = Object.values(zipfiles)[i]
-                    const ename = entry.entryName.toLowerCase().split('/')[entry.entryName.toLowerCase().split('/').length-1]
-                    //console.log(ename)
-                    if((ename.startsWith('preview') || ename.startsWith('screenshot')) && valid.includes(ename.split('.')[ename.split('.').length-1])){
-                        //console.log('1')
-                        res.contentType('image/'+ename.split('.')[ename.split('.').length-1])
-                        res.send(entry.getData())
-                        break;
-                    } else if(convalid.includes(ename.split('.')[ename.split('.').length-1])){
-                        //console.log('2')
-                        contenders.push(entry)
-                    }
+    var buffer = await response.buffer()
+    var zip = new AdmZip(buffer);
+    var zipfiles = zip.getEntries()
+    var valid = ['png', 'jpg', 'jpeg', 'bmp']
+    var convalid = ['jpg', 'jpeg']
+    var contenders = []
 
-                    if(i >= Object.values(zipfiles).length-1 && contenders.length > 0){
-                        //console.log('3')
-                        //console.log(contenders[0].entryName)
-                        var conename = contenders[0].entryName.toLowerCase().split('/')[contenders[0].entryName.toLowerCase().split('/').length-1]
-                        res.contentType('image/'+conename.split('.')[conename.split('.').length-1])
-                        res.send(contenders[0].getData())
-                        break;
-                    } else if(i >= Object.values(zipfiles).length-1){
-                        //console.log('4')
-                        res.status(200).send('')
-                        break;
-                    }
-                }
-            } else {
-                res.status(200).send('')
-            }
-        });
+    for (let i = 0; i < Object.values(zipfiles).length; i++) {
+        const entry = Object.values(zipfiles)[i]
+        const ename = entry.entryName.toLowerCase().split('/')[entry.entryName.toLowerCase().split('/').length - 1]
+        //console.log(ename)
+        if ((ename.startsWith('preview') || ename.startsWith('screenshot')) && valid.includes(ename.split('.')[ename.split('.').length - 1])) {
+            //console.log('1')
+            res.contentType('image/' + ename.split('.')[ename.split('.').length - 1])
+            res.send(entry.getData())
+            break;
+        } else if (convalid.includes(ename.split('.')[ename.split('.').length - 1])) {
+            //console.log('2')
+            contenders.push(entry)
+        }
+
+        if (i >= Object.values(zipfiles).length - 1 && contenders.length > 0) {
+            //console.log('3')
+            //console.log(contenders[0].entryName)
+            var conename = contenders[0].entryName.toLowerCase().split('/')[contenders[0].entryName.toLowerCase().split('/').length - 1]
+            res.contentType('image/' + conename.split('.')[conename.split('.').length - 1])
+            res.send(contenders[0].getData())
+            break;
+        } else if (i >= Object.values(zipfiles).length - 1) {
+            //console.log('4')
+            res.status(200).send('')
+            break;
+        }
+    }
 })
 
 //preview downloader
@@ -236,16 +229,16 @@ app.get('/games/xml/:titleid.xml', async (req, res) => {
     })
 
     var titleid = encodeURIComponent(req.params.titleid.toUpperCase())
-    if(titleid.length != 8) return res.status(200).send(''); //200 on these because instead of requesting it to be added itll just say it doesnt exist
-    if(isNaN(parseInt(titleid, 16))) return res.status(200).send('');
-    if(!tiddb[titleid]) return res.status(200).send('');
+    if (titleid.length != 8) return res.status(200).send(''); //200 on these because instead of requesting it to be added (not a feature never will be) itll just say it doesnt exist
+    if (isNaN(parseInt(titleid, 16))) return res.status(200).send('');
+    if (!tiddb[titleid]) return res.status(200).send('');
     var info = tiddb[titleid]
 
     var vidid = 0
 
-    for(let i = 0; i < prindex.unleashx.length; i++) {
-        if(prindex.unleashx[i].toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim().slice(0, -3) === info.title.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim()){
-            vidid = i+1
+    for (let i = 0; i < prindex.unleashx.length; i++) {
+        if (prindex.unleashx[i].toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim().slice(0, -3) === info.title.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim()) {
+            vidid = i + 1
         }
     }
 
@@ -262,28 +255,19 @@ app.get('/games/sendvid.php', async (req, res) => {
         time: Date.now(),
         xbox: parseUa(req.headers['user-agent'])
     })
-    
-    if(parseUa(req.headers['user-agent']) === undefined) return res.redirect(req.url)
 
-    var sid = parseInt(req.query.sid)-1
-    if(isNaN(sid)) return res.status(404).send('')
-    if(!prindex.unleashx[sid]) return res.status(404).send('')
-    
-    request({
-            url: `https://raw.githubusercontent.com/whakama/xbox-previews-archive/main/${encodeURIComponent(prindex.unleashx[sid])}`,
-            encoding: null
-        },
-        (err, resp, buffer) => {
-            if (!err && resp.statusCode === 200) {
-                //console.log('sending')
-                res.send(buffer)
-                return;
-            } else {
-                //console.log('404')
-                res.status(404).send('')
-                return;
-            }
-        })
+    if (parseUa(req.headers['user-agent']) === undefined) return res.redirect(req.url)
+
+    var sid = parseInt(req.query.sid) - 1
+    if (isNaN(sid)) return res.status(404).send('')
+    if (!prindex.unleashx[sid]) return res.status(404).send('')
+
+    var response = await fetch(`https://raw.githubusercontent.com/whakama/xbox-previews-archive/main/${encodeURIComponent(prindex.unleashx[sid])}`)
+    if (!response.ok) return res.status(404).send('');
+
+    var buffer = await response.buffer()
+
+    res.send(buffer)
 })
 
 
@@ -298,7 +282,7 @@ app.all('*', (req, res) => { //since its after everything it just 404s shit that
 
 
 app.listen(745, () => {
-    console.log("listening on port 745");
+    console.log('listening on port 745');
 })
 
 console.log('starting')
