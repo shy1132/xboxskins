@@ -56,7 +56,7 @@ async function updatePreviewIndexes(){
     console.log('updating preview indexes')
     prindex.unleashx = []
     //console.log('fetching tree sha')
-    var rootsha = await (await octokit.request('HEAD /repos/whakama/xbox-previews-archive/contents/')).headers.etag.split('W/"')[1].split('"')[0]
+    var rootsha = (await octokit.request('HEAD /repos/whakama/xbox-previews-archive/contents/')).headers.etag.split('W/"')[1].split('"')[0]
     await octokit.request('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', {
         owner: 'whakama',
         repo: 'xbox-previews-archive',
@@ -75,7 +75,7 @@ async function updateSkinIndexes(){
     console.log('updating skin indexes')
     skindex.unleashx = []
     //console.log('fetching tree sha')
-    var rootsha = await (await octokit.request('HEAD /repos/whakama/xbox-skins-archive/contents/')).headers.etag.split('W/"')[1].split('"')[0]
+    var rootsha = (await octokit.request('HEAD /repos/whakama/xbox-skins-archive/contents/')).headers.etag.split('W/"')[1].split('"')[0]
     //console.log('root sha obtained ['+rootsha+']')
     //console.log('fetching unleashx tree sha')
     var unsha;
@@ -128,9 +128,9 @@ app.get('/rss/uxdash.php', async (req, res) => { //this has nothing to do with p
     for (let i = 0; i < skindex.unleashx.length; i++) {
         var file = skindex.unleashx[i]
         if(file.name.includes('[NSFW]')) {
-            nsfwitems.push(uxEntry(`~${htmlEncode(file.name.slice(0, -4))}`, `http://www.xbox-skins.net/uxdash/download/${file.id}.zip`, `http://www.xbox-skins.net/uxdash/thumb/${encodeURIComponent(file.id)}.jpg`))
+            nsfwitems.push(uxEntry(`~${htmlEncode(file.name.slice(0, -4))}`, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/thumbs/${encodeURIComponent(file.id)}.jpg`))
         } else {
-            items.push(uxEntry(`${htmlEncode(file.name.slice(0, -4))}`, `http://www.xbox-skins.net/uxdash/download/${file.id}.zip`, `http://www.xbox-skins.net/uxdash/thumb/${encodeURIComponent(file.id)}.jpg`))
+            items.push(uxEntry(`${htmlEncode(file.name.slice(0, -4))}`, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/thumbs/${encodeURIComponent(file.id)}.jpg`))
         }
     }
     items = items.concat(nsfwitems)
@@ -140,7 +140,7 @@ app.get('/rss/uxdash.php', async (req, res) => { //this has nothing to do with p
     res.send(xml)
 })
 
-app.get('/uxdash/download/:skin.zip', async (req, res) => {
+app.get('/downloads/skins/:skin.zip', async (req, res) => {
     console.log({
         req: 'ux_sdl',
         ip: parseForwarded(req.headers['x-forwarded-for']),
@@ -167,7 +167,7 @@ app.get('/uxdash/download/:skin.zip', async (req, res) => {
         });
 })
 
-app.get('/uxdash/thumb/:skin.jpg', async (req, res) => {
+app.get('/downloads/thumbs/:skin.jpg', async (req, res) => {
     console.log({
         req: 'ux_simg',
         ip: parseForwarded(req.headers['x-forwarded-for']),
