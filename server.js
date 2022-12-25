@@ -280,6 +280,11 @@ app.all('*', (req, res) => { //since its after everything it just 404s shit that
     res.status(404).send('')
 });
 
+app.use((error, req, res, next) => { //error handler so i dont accidentally leak anything/mess with an xbox in a weird way lol
+    console.log(`error on ${req.path}: ${error.message}`)
+    res.status(500).send('')
+})
+
 
 app.listen(745, () => {
     console.log('listening on port 745');
