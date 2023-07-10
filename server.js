@@ -1,20 +1,18 @@
 process.on('uncaughtException', function(exception) {
     console.log(exception.stack)
-});
+})
 
 //requires
 const express = require('express')
-const fetch = require('node-fetch')
 const AdmZip = require('adm-zip')
 const { Octokit } = require('octokit')
 const auth = require('./auth.json')
 const titleIds = require('./files/titleIds.json')
 
-
 //setups
 const octokit = new Octokit({
     auth: auth.octokit
-});
+})
 
 const app = express()
 
@@ -25,87 +23,107 @@ app.disable('x-powered-by')
 //variables
 var skinIndex = []
 var previewIndex = []
+var skinCache = {}
 
 //functions
 function htmlEncode(str) {
-    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function uxEntry(title, link, thumb) {
-    return `<item><title>${title}</title><link>${link}</link><thumb>${thumb}</thumb></item>`
+    return `<item><title>${title}</title><link>${link}</link><thumb>${thumb}</thumb></item>`;
 }
 
 function parseForwarded(header) {
     if (header && header.split(',')[header.split(',').length - 1]) {
-        return header.split(',')[header.split(',').length - 1].trim()
-    } else return null
+        return header.split(',')[header.split(',').length - 1].trim();
+    } else return null;
 }
 
 function parseUa(header) {
     if (header && header.startsWith('Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1')) {
-        return true
-    } else return header
+        return true;
+    } else return header;
 }
 
 async function updateSkinIndexes() {
     console.log('updating skin indexes')
     skinIndex = []
-    //console.log('fetching tree sha')
-    var rootsha = (await octokit.request('HEAD /repos/whakama/xbox-skins-archive/contents/')).headers.etag.split('W/"')[1].split('"')[0]
-    //console.log('root sha obtained ['+rootsha+']')
-    //console.log('fetching unleashx tree sha')
-    var unsha;
-    await octokit.request('GET /repos/whakama/xbox-skins-archive/git/trees/' + rootsha).then(res => {
+
+    var rootHash = (await octokit.request('HEAD /repos/whakama/xbox-skins-archive/contents/')).headers.etag.split('W/"')[1].split('"')[0]
+    var treeHash;
+    await octokit.request('GET /repos/whakama/xbox-skins-archive/git/trees/' + rootHash).then(res => {
         for (let i = 0; i < res.data.tree.length; i++) {
             if (res.data.tree[i].path === 'unleashx') {
-                return unsha = res.data.tree[i].sha
+                return treeHash = res.data.tree[i].sha
             }
         }
     })
-    //console.log('unleashx sha obtained ['+unsha+']')
-    //console.log('fetching files')
-    await octokit.request('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', {
+
+    var files = await octokit.request('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', {
         owner: 'whakama',
         repo: 'xbox-skins-archive',
-        tree_sha: unsha
-    }).then(res => {
-        //console.log('files fetched')
-        for (let i = 0; i < res.data.tree.length; i++) {
-            var name = res.data.tree[i].path.split('/').pop()
-            skinIndex.push({
-                name,
-                download: `https://raw.githubusercontent.com/whakama/xbox-skins-archive/main/unleashx/${encodeURIComponent(name)}`,
-                id: i
-            })
-        }
-        console.log('finished updating skin indexes')
+        tree_sha: treeHash
     })
+
+    for (let i = 0; i < files.data.tree.length; i++) {
+        let name = files.data.tree[i].path.split('/').pop()
+        skinIndex.push({
+            name,
+            download: `https://raw.githubusercontent.com/whakama/xbox-skins-archive/main/unleashx/${encodeURIComponent(name)}`,
+            id: i
+        })
+    }
+
+    console.log('finished updating skin indexes')
 }
 
 async function updatePreviewIndexes() {
     console.log('updating preview indexes')
     previewIndex = []
-    //console.log('fetching tree sha')
-    var rootsha = (await octokit.request('HEAD /repos/whakama/xbox-previews-archive/contents/')).headers.etag.split('W/"')[1].split('"')[0]
-    await octokit.request('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', {
+
+    var rootHash = (await octokit.request('HEAD /repos/whakama/xbox-previews-archive/contents/')).headers.etag.split('W/"')[1].split('"')[0]
+    var files = await octokit.request('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', {
         owner: 'whakama',
         repo: 'xbox-previews-archive',
-        tree_sha: rootsha
-    }).then(res => {
-        //console.log('files fetched')
-        for (let i = 0; i < res.data.tree.length; i++) {
-            var wmv = res.data.tree[i].path.split('/').pop()
-            previewIndex.push(wmv)
-        }
-        console.log('finished updating preview indexes')
+        tree_sha: rootHash
     })
+
+    for (let i = 0; i < files.data.tree.length; i++) {
+        let wmvFile = files.data.tree[i].path.split('/').pop()
+        previewIndex.push(wmvFile)
+    }
+
+    console.log('finished updating preview indexes')
+}
+
+function clearSkinCache() {
+    var expiryDeadline = Date.now()
+    var skinsCleared = 0
+
+    var skinCacheArr = Object.keys(skinCache)
+    if(skinCacheArr.length > 10) {
+        skinsCleared = skinCacheArr.length
+        skinCache = {}; //prevent memory leak by someone who may decide to try it
+        skinCacheArr = [];
+    }
+
+    for (let i = 0; i < skinCacheArr.length; i++) {
+        var entry = skinCache[skinCacheArr[i]]
+        if(expiryDeadline > entry.expires) {
+            delete skinCache[skinCacheArr[i]];
+            skinsCleared++;
+        }
+    }
+    
+    if(skinsCleared > 0) console.log(`cleared cache for ${skinsCleared} skins`)
 }
 
 updateSkinIndexes()
 updatePreviewIndexes()
 setInterval(updateSkinIndexes, 21600000)
 setInterval(updatePreviewIndexes, 21600000)
-
+setInterval(clearSkinCache, 60000) //just checks every minute to see if any cache needs to be cleared
 
 //code
 //skin downloader
@@ -118,7 +136,7 @@ app.get('/rss/uxdash.php', async (req, res) => { //sends a giant xml of all the 
     })
 
     var items = [ //this will always show at the top, so i put some information here for anyone confused (since its just a giant list of skins)
-        uxEntry('! unofficial xbox-skins reimplementation', 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg'),
+        uxEntry('! unofficial UnleashX skin downloader', 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg'),
         uxEntry('!! see www.xbox-skins.net in your browser for more information', 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg'),
         uxEntry('!!! ------------------------------------------------------------------------------------------- !!!', 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg')
     ]
@@ -127,9 +145,9 @@ app.get('/rss/uxdash.php', async (req, res) => { //sends a giant xml of all the 
     for (let i = 0; i < skinIndex.length; i++) {
         var file = skinIndex[i]
         if (file.name.includes('[NSFW]')) {
-            nsfwItems.push(uxEntry(`~${htmlEncode(file.name.slice(0, -4))}`, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/thumbs/${encodeURIComponent(file.id)}.jpg`))
+            nsfwItems.push(uxEntry(`~${htmlEncode(file.name.slice(0, -4))}`, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/thumbs/${encodeURIComponent(file.id)}`))
         } else {
-            items.push(uxEntry(`${htmlEncode(file.name.slice(0, -4))}`, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/thumbs/${encodeURIComponent(file.id)}.jpg`))
+            items.push(uxEntry(`${htmlEncode(file.name.slice(0, -4))}`, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/thumbs/${encodeURIComponent(file.id)}`))
         }
     }
     items = items.concat(nsfwItems)
@@ -147,21 +165,28 @@ app.get('/downloads/skins/:skin.zip', async (req, res) => { //sends the zip file
         xbox: parseUa(req.headers['user-agent'])
     })
 
-    if (!req.params.skin) return res.status(404).send('')
+    if (!req.params.skin) return res.status(404).send('');
 
     const id = parseInt(req.params.skin)
-    if (id > skinIndex.length - 1 || id < 0 || isNaN(id)) return res.status(404).send('')
+    if (id > skinIndex.length - 1 || id < 0 || isNaN(id)) return res.status(404).send('');
+    
+    if(skinCache[id]?.zip) {
+        skinCache[id] = { ...skinCache[id], expires: Date.now()+300000 }
+        res.contentType('application/zip')
+        return res.send(skinCache[id].zip);
+    }
 
     var response = await fetch(skinIndex[id].download)
-    if (!response.ok) return res.status(404).send('')
+    if (!response.ok) return res.status(404).send('');
 
-    var buffer = await response.buffer()
+    var buffer = Buffer.from(await response.arrayBuffer())
+    skinCache[id] = { ...skinCache[id], zip: buffer, expires: Date.now()+300000 }
 
     res.contentType('application/zip')
     res.send(buffer)
 })
 
-app.get('/downloads/thumbs/:skin.jpg', async (req, res) => { //sends a thumbnail of the skin, skins are supposed to have a file in them for this so it reads through the files and tries to find it
+app.get('/downloads/thumbs/:skin', async (req, res) => { //sends a thumbnail of the skin, skins are supposed to have a file in them for this so it reads through the files and tries to find it
     console.log({
         req: 'ux_simg',
         ip: parseForwarded(req.headers['x-forwarded-for']),
@@ -169,16 +194,30 @@ app.get('/downloads/thumbs/:skin.jpg', async (req, res) => { //sends a thumbnail
         xbox: parseUa(req.headers['user-agent'])
     })
 
-    if (!req.params.skin) return res.status(404).send('')
+    if (!req.params.skin) return res.status(404).send('');
 
     const id = parseInt(req.params.skin)
-    if (id > skinIndex.length - 1 || id < 0 || isNaN(id)) return res.status(404).send('')
+    if (id > skinIndex.length - 1 || id < 0 || isNaN(id)) return res.status(404).send('');
 
-    var response = await fetch(skinIndex[id].download)
-    if (!response.ok) return res.status(200).send('') //200 because it breaks otherwise
+    if(skinCache[id]?.thumbnailFile) {
+        skinCache[id] = { ...skinCache[id], expires: Date.now()+300000 }
+        if(skinCache[id].thumbnailFile === 'no_thumbnail') return res.status(200).send('')
+        res.contentType(skinCache[id].thumbnailMimeType)
+        return res.send(skinCache[id].thumbnailFile);
+    }
 
-    var buffer = await response.buffer()
-    var zip = new AdmZip(buffer)
+    if(skinCache[id]?.zip) {
+        skinCache[id] = { ...skinCache[id], expires: Date.now()+300000 }
+        var zip = new AdmZip(skinCache[id].zip)
+    } else {
+        var response = await fetch(skinIndex[id].download)
+        if (!response.ok) return res.status(200).send(''); //200 because it breaks otherwise
+    
+        var buffer = Buffer.from(await response.arrayBuffer())
+        skinCache[id] = { ...skinCache[id], zip: buffer, expires: Date.now()+300000 }
+        var zip = new AdmZip(buffer)
+    }
+
     var zipEntries = zip.getEntries()
     var validFormats = ['png', 'jpg', 'jpeg', 'bmp']
 
@@ -188,18 +227,18 @@ app.get('/downloads/thumbs/:skin.jpg', async (req, res) => { //sends a thumbnail
         const entryExtension = entryName.split('.')[entryName.split('.').length - 1]
 
         if ((entryName.startsWith('preview') || entryName.startsWith('screenshot')) && validFormats.includes(entryExtension)) {
+            var thumbnailBuffer = entry.getData()
+            skinCache[id] = { ...skinCache[id], thumbnailFile: thumbnailBuffer, thumbnailMimeType: 'image/' + entryExtension, expires: Date.now()+300000 }
             res.contentType('image/' + entryExtension)
             res.send(entry.getData())
             break;
         }
         
         if (i >= Object.values(zipEntries).length - 1) {
+            skinCache[id] = { ...skinCache[id], thumbnailFile: 'no_thumbnail', thumbnailMimeType: 'no_thumbnail', expires: Date.now()+300000 }
             res.status(200).send('')
             break;
         }
-        
-
-        //^^ there used to be some code here that did something but im not sure fucking what at all so i removed it and hope it doesnt do anything important (because under no circumstance should it even run)
     }
 })
 
@@ -213,13 +252,12 @@ app.get('/games/xml/:titleid.xml', async (req, res) => { //sends an xml file fro
     })
 
     var titleId = encodeURIComponent(req.params.titleid.toUpperCase())
-    if (titleId.length != 8) return res.status(200).send('') //200 on these because instead of requesting it to be added (not a feature never will be) itll just say it doesnt exist
-    if (isNaN(parseInt(titleId, 16))) return res.status(200).send('')
-    if (!titleIds[titleId]) return res.status(200).send('')
+    if (titleId.length != 8) return res.status(200).send(''); //200 on these because instead of requesting it to be added (not a feature never will be) itll just say it doesnt exist
+    if (isNaN(parseInt(titleId, 16))) return res.status(200).send('');
+    if (!titleIds[titleId]) return res.status(200).send('');
+
     var info = titleIds[titleId]
-
     var videoId = 0
-
     for (let i = 0; i < previewIndex.length; i++) {
         if (previewIndex[i].toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim().slice(0, -3) === info.title.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim()) {
             videoId = i + 1
@@ -248,7 +286,7 @@ app.get('/games/sendvid.php', async (req, res) => { //sends a preview of a game 
     var response = await fetch(`https://raw.githubusercontent.com/whakama/xbox-previews-archive/main/${encodeURIComponent(previewIndex[videoId])}`)
     if (!response.ok) return res.status(404).send('')
 
-    var buffer = await response.buffer()
+    var buffer = Buffer.from(await response.arrayBuffer())
 
     res.send(buffer)
 })
