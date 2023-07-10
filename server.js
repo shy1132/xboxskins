@@ -5,14 +5,13 @@ process.on('uncaughtException', function(exception) {
 //requires
 const express = require('express')
 const AdmZip = require('adm-zip')
-const { Octokit } = require('octokit')
-const auth = require('./auth.json')
+const fs = require('fs')
+const path = require('path')
 const titleIds = require('./files/titleIds.json')
 
 //setups
-const octokit = new Octokit({
-    auth: auth.octokit
-})
+if(!fs.existsSync('./files/skins')) return console.log('no skins folder in ./files/skins!')
+if(!fs.existsSync('./files/previews')) return console.log('no previews folder in ./files/previews!')
 
 const app = express()
 
@@ -47,54 +46,39 @@ function parseUa(header) {
 }
 
 async function updateSkinIndexes() {
-    console.log('updating skin indexes')
+    console.log('updating skin index')
     skinIndex = []
 
-    var rootHash = (await octokit.request('HEAD /repos/whakama/xbox-skins-archive/contents/')).headers.etag.split('W/"')[1].split('"')[0]
-    var treeHash;
-    await octokit.request('GET /repos/whakama/xbox-skins-archive/git/trees/' + rootHash).then(res => {
-        for (let i = 0; i < res.data.tree.length; i++) {
-            if (res.data.tree[i].path === 'unleashx') {
-                return treeHash = res.data.tree[i].sha
-            }
-        }
-    })
+    var files = await fs.promises.readdir('./files/skins/')
 
-    var files = await octokit.request('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', {
-        owner: 'whakama',
-        repo: 'xbox-skins-archive',
-        tree_sha: treeHash
-    })
-
-    for (let i = 0; i < files.data.tree.length; i++) {
-        let name = files.data.tree[i].path.split('/').pop()
+    for (let i = 0; i < files.length; i++) {
+        let name = files[i]
         skinIndex.push({
             name,
-            download: `https://raw.githubusercontent.com/whakama/xbox-skins-archive/main/unleashx/${encodeURIComponent(name)}`,
+            path: path.resolve(`./files/skins/${name}`),
             id: i
         })
     }
 
-    console.log('finished updating skin indexes')
+    console.log('finished updating skin index')
 }
 
 async function updatePreviewIndexes() {
-    console.log('updating preview indexes')
+    console.log('updating preview index')
     previewIndex = []
 
-    var rootHash = (await octokit.request('HEAD /repos/whakama/xbox-previews-archive/contents/')).headers.etag.split('W/"')[1].split('"')[0]
-    var files = await octokit.request('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', {
-        owner: 'whakama',
-        repo: 'xbox-previews-archive',
-        tree_sha: rootHash
-    })
+    var files = await fs.promises.readdir('./files/previews/')
 
-    for (let i = 0; i < files.data.tree.length; i++) {
-        let wmvFile = files.data.tree[i].path.split('/').pop()
-        previewIndex.push(wmvFile)
+    for (let i = 0; i < files.length; i++) {
+        let name = files[i]
+        previewIndex.push({
+            name,
+            path: path.resolve(`./files/previews/${name}`),
+            id: i
+        })
     }
 
-    console.log('finished updating preview indexes')
+    console.log('finished updating preview index')
 }
 
 function clearSkinCache() {
@@ -176,12 +160,8 @@ app.get('/downloads/skins/:skin.zip', async (req, res) => { //sends the zip file
         return res.send(skinCache[id].zip);
     }
 
-    var response = await fetch(skinIndex[id].download)
-    if (!response.ok) return res.status(404).send('');
-
-    var buffer = Buffer.from(await response.arrayBuffer())
+    var buffer = await fs.promises.readFile(skinIndex[id].path)
     skinCache[id] = { ...skinCache[id], zip: buffer, expires: Date.now()+300000 }
-
     res.contentType('application/zip')
     res.send(buffer)
 })
@@ -210,16 +190,14 @@ app.get('/downloads/thumbs/:skin', async (req, res) => { //sends a thumbnail of 
         skinCache[id] = { ...skinCache[id], expires: Date.now()+300000 }
         var zip = new AdmZip(skinCache[id].zip)
     } else {
-        var response = await fetch(skinIndex[id].download)
-        if (!response.ok) return res.status(200).send(''); //200 because it breaks otherwise
-    
-        var buffer = Buffer.from(await response.arrayBuffer())
+        var buffer = await fs.promises.readFile(skinIndex[id].path)
         skinCache[id] = { ...skinCache[id], zip: buffer, expires: Date.now()+300000 }
         var zip = new AdmZip(buffer)
     }
 
     var zipEntries = zip.getEntries()
     var validFormats = ['png', 'jpg', 'jpeg', 'bmp']
+    var contenders = []
 
     for (let i = 0; i < Object.values(zipEntries).length; i++) {
         const entry = Object.values(zipEntries)[i]
@@ -232,9 +210,18 @@ app.get('/downloads/thumbs/:skin', async (req, res) => { //sends a thumbnail of 
             res.contentType('image/' + entryExtension)
             res.send(entry.getData())
             break;
+        } else if (validFormats.includes(entryExtension)) {
+            contenders.push(entry)
         }
-        
-        if (i >= Object.values(zipEntries).length - 1) {
+
+        if (i >= Object.values(zipEntries).length - 1 && contenders[0]) {
+            const contenderEntry = contenders[0]
+            const contenderEntryName = contenderEntry.entryName.toLowerCase().split('/')[contenderEntry.entryName.toLowerCase().split('/').length - 1]
+            const contenderEntryExtension = contenderEntryName.split('.')[contenderEntryName.split('.').length - 1]
+            res.contentType('image/' + contenderEntryExtension)
+            res.send(contenders[0].getData())
+            break;
+        } else if (i >= Object.values(zipEntries).length - 1) {
             skinCache[id] = { ...skinCache[id], thumbnailFile: 'no_thumbnail', thumbnailMimeType: 'no_thumbnail', expires: Date.now()+300000 }
             res.status(200).send('')
             break;
@@ -243,7 +230,7 @@ app.get('/downloads/thumbs/:skin', async (req, res) => { //sends a thumbnail of 
 })
 
 //preview downloader
-app.get('/games/xml/:titleid.xml', async (req, res) => { //sends an xml file from a game's title id
+app.get('/games/xml/:titleId.xml', async (req, res) => { //sends an xml file from a game's title id
     console.log({
         req: 'ux_ptid',
         ip: parseForwarded(req.headers['x-forwarded-for']),
@@ -251,7 +238,7 @@ app.get('/games/xml/:titleid.xml', async (req, res) => { //sends an xml file fro
         xbox: parseUa(req.headers['user-agent'])
     })
 
-    var titleId = encodeURIComponent(req.params.titleid.toUpperCase())
+    var titleId = encodeURIComponent(req.params.titleId.toUpperCase())
     if (titleId.length != 8) return res.status(200).send(''); //200 on these because instead of requesting it to be added (not a feature never will be) itll just say it doesnt exist
     if (isNaN(parseInt(titleId, 16))) return res.status(200).send('');
     if (!titleIds[titleId]) return res.status(200).send('');
@@ -259,7 +246,7 @@ app.get('/games/xml/:titleid.xml', async (req, res) => { //sends an xml file fro
     var info = titleIds[titleId]
     var videoId = 0
     for (let i = 0; i < previewIndex.length; i++) {
-        if (previewIndex[i].toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim().slice(0, -3) === info.title.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim()) {
+        if (previewIndex[i].name.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim().slice(0, -3) === info.title.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim()) {
             videoId = i + 1
         }
     }
@@ -277,17 +264,13 @@ app.get('/games/sendvid.php', async (req, res) => { //sends a preview of a game 
         xbox: parseUa(req.headers['user-agent'])
     })
 
-    if (parseUa(req.headers['user-agent']) === undefined) return res.redirect(req.url)
+    if (parseUa(req.headers['user-agent']) === undefined) return res.redirect(req.url) //weird unleashx bug
 
     var videoId = parseInt(req.query.sid) - 1
     if (isNaN(videoId)) return res.status(404).send('')
     if (!previewIndex[videoId]) return res.status(404).send('')
 
-    var response = await fetch(`https://raw.githubusercontent.com/whakama/xbox-previews-archive/main/${encodeURIComponent(previewIndex[videoId])}`)
-    if (!response.ok) return res.status(404).send('')
-
-    var buffer = Buffer.from(await response.arrayBuffer())
-
+    var buffer = await fs.promises.readFile(previewIndex[videoId].path)
     res.send(buffer)
 })
 

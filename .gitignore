@@ -127,4 +127,5 @@ dist
 .pnp.*
 
 # specific to this repo
-auth.json
+files/skins
+files/previews
