@@ -291,7 +291,6 @@ app.get('/games/sendvid.php', async (req, res) => { //sends a preview of a game 
     res.send(buffer)
 })
 
-
 //misc
 app.get('/404/:message', (req, res) => { //unleashx will output :message due to it being the text after the last slash
     res.status(404).send('')
@@ -305,7 +304,6 @@ app.use((error, req, res, next) => { //error handler so i dont accidentally leak
     console.log(`error on ${req.path}: ${error.message}`)
     res.status(500).send('')
 })
-
 
 app.listen(14380, () => {
     console.log('listening on port 14380')
