@@ -121,7 +121,7 @@ app.get('/rss/uxdash.php', async (req, res) => { //sends a giant xml of all the 
     })
 
     var items = [ //this will always show at the top, so i put some information here for anyone confused (since its just a giant list of skins)
-        uxEntry(`! unofficial UnleashX skin downloader v${package.version}`, 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg'),
+        uxEntry(`! unofficial UnleashX skin downloader`, 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg'),
         uxEntry('!! see www.xbox-skins.net in your browser for more information', 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg'),
         uxEntry('!!! ------------------------------------------------------------------------------------------- !!!', 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg')
     ]
