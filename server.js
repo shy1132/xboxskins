@@ -8,7 +8,6 @@ const AdmZip = require('adm-zip')
 const fs = require('fs')
 const path = require('path')
 const titleIds = require('./files/titleIds.json')
-const package = require('./package.json')
 
 //setups
 if(!fs.existsSync('./files/skins')) return console.log('no skins folder in ./files/skins!')
@@ -30,7 +29,7 @@ function htmlEncode(str) {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function uxEntry(title, link, thumb) {
+function rssEntry(title, link, thumb) {
     return `<item><title>${title}</title><link>${link}</link><thumb>${thumb}</thumb></item>`;
 }
 
@@ -121,20 +120,22 @@ app.get('/rss/uxdash.php', async (req, res) => { //sends a giant xml of all the 
     })
 
     var items = [ //this will always show at the top, so i put some information here for anyone confused (since its just a giant list of skins)
-        uxEntry(`! unofficial UnleashX skin downloader`, 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg'),
-        uxEntry('!! see www.xbox-skins.net in your browser for more information', 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg'),
-        uxEntry('!!! ------------------------------------------------------------------------------------------- !!!', 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg')
+        rssEntry(`! unofficial UnleashX skin downloader`, 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg'),
+        rssEntry('!! see www.xbox-skins.net in your browser for more information', 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg'),
+        rssEntry('!!! ------------------------------------------------------------------------------------------- !!!', 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg')
     ]
+
     var nsfwItems = []
 
     for (let i = 0; i < skinIndex.length; i++) {
         var file = skinIndex[i]
         if (file.name.includes('[NSFW]')) {
-            nsfwItems.push(uxEntry(`~${htmlEncode(file.name.slice(0, -4))}`, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/thumbs/${encodeURIComponent(file.id)}`))
+            nsfwItems.push(rssEntry(`~${htmlEncode(file.name.slice(0, -4))}`, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/thumbs/${encodeURIComponent(file.id)}`))
         } else {
-            items.push(uxEntry(`${htmlEncode(file.name.slice(0, -4))}`, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/thumbs/${encodeURIComponent(file.id)}`))
+            items.push(rssEntry(`${htmlEncode(file.name.slice(0, -4))}`, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/thumbs/${encodeURIComponent(file.id)}`))
         }
     }
+
     items = items.concat(nsfwItems)
 
     var xml = `<?xml version='1.0'?><!DOCTYPE rss PUBLIC "-//Netscape Communications//DTD RSS 0.91//E" "http://my.netscape.com/publish/formats/rss-0.91.dtd"><rss version="0.91"><channel><title>www.xbox-skins.net replacement server</title><link>http://www.xbox-skins.net</link><language>en-us</language>${items.join('')}</channel></rss>`
@@ -201,12 +202,12 @@ app.get('/downloads/thumbs/:skin', async (req, res) => { //sends a thumbnail of 
     var contenders = []
 
     for (let i = 0; i < Object.values(zipEntries).length; i++) {
-        const entry = Object.values(zipEntries)[i]
-        const entryName = entry.entryName.toLowerCase().split('/')[entry.entryName.toLowerCase().split('/').length - 1]
-        const entryExtension = entryName.split('.')[entryName.split('.').length - 1]
+        let entry = Object.values(zipEntries)[i]
+        let entryName = entry.entryName.toLowerCase().split('/')[entry.entryName.toLowerCase().split('/').length - 1]
+        let entryExtension = entryName.split('.')[entryName.split('.').length - 1]
 
         if ((entryName.startsWith('preview') || entryName.startsWith('screenshot')) && validFormats.includes(entryExtension)) {
-            var thumbnailBuffer = entry.getData()
+            let thumbnailBuffer = entry.getData()
             skinCache[id] = { ...skinCache[id], thumbnailFile: thumbnailBuffer, thumbnailMimeType: 'image/' + entryExtension, expires: Date.now()+300000 }
             res.contentType('image/' + entryExtension)
             res.send(entry.getData())
@@ -216,9 +217,9 @@ app.get('/downloads/thumbs/:skin', async (req, res) => { //sends a thumbnail of 
         }
 
         if (i >= Object.values(zipEntries).length - 1 && contenders[0]) {
-            const contenderEntry = contenders[0]
-            const contenderEntryName = contenderEntry.entryName.toLowerCase().split('/')[contenderEntry.entryName.toLowerCase().split('/').length - 1]
-            const contenderEntryExtension = contenderEntryName.split('.')[contenderEntryName.split('.').length - 1]
+            let contenderEntry = contenders[0]
+            let contenderEntryName = contenderEntry.entryName.toLowerCase().split('/')[contenderEntry.entryName.toLowerCase().split('/').length - 1]
+            let contenderEntryExtension = contenderEntryName.split('.')[contenderEntryName.split('.').length - 1]
             res.contentType('image/' + contenderEntryExtension)
             res.send(contenders[0].getData())
             break;
