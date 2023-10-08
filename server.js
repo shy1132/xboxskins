@@ -10,8 +10,8 @@ const path = require('path')
 const titleIds = require('./files/titleIds.json')
 
 //setups
-if(!fs.existsSync('./files/skins')) return console.log('no skins folder in ./files/skins!')
-if(!fs.existsSync('./files/previews')) return console.log('no previews folder in ./files/previews!')
+if(!fs.existsSync('./files/skins')) return console.log('no skins folder in ./files/skins!');
+if(!fs.existsSync('./files/previews')) return console.log('no previews folder in ./files/previews!');
 
 const app = express()
 
@@ -183,7 +183,7 @@ app.get('/downloads/thumbs/:skin', async (req, res) => { //sends a thumbnail of 
 
     if(skinCache[id]?.thumbnailFile) {
         skinCache[id] = { ...skinCache[id], expires: Date.now()+300000 }
-        if(skinCache[id].thumbnailFile === 'no_thumbnail') return res.status(200).send('')
+        if(skinCache[id].thumbnailFile === 'no_thumbnail') return res.status(200).send('');
         res.contentType(skinCache[id].thumbnailMimeType)
         return res.send(skinCache[id].thumbnailFile);
     }
@@ -266,11 +266,11 @@ app.get('/games/sendvid.php', async (req, res) => { //sends a preview of a game 
         xbox: parseUa(req.headers['user-agent'])
     })
 
-    if (parseUa(req.headers['user-agent']) === undefined) return res.redirect(req.url) //weird unleashx bug
+    if (parseUa(req.headers['user-agent']) === undefined) return res.redirect(req.url); //weird unleashx bug
 
     var videoId = parseInt(req.query.sid) - 1
-    if (isNaN(videoId)) return res.status(404).send('')
-    if (!previewIndex[videoId]) return res.status(404).send('')
+    if (isNaN(videoId)) return res.status(404).send('');
+    if (!previewIndex[videoId]) return res.status(404).send('');
 
     var buffer = await fs.promises.readFile(previewIndex[videoId].path)
     res.send(buffer)
