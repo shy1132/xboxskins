@@ -199,7 +199,7 @@ app.get('/games/xml/:titleId', async (req, res) => { //sends an xml file from a 
 app.get('/games/sendvid.php', async (req, res) => { //sends a preview of a game by it's id
     logRequest('ux_vid', req)
 
-    if (!req.headers['user-agent']) return res.redirect(req.url); //weird unleashx bug where it doesnt send a user agent sometimes
+    if (!req.headers['user-agent']) return res.redirect(req.url); //weird unleashx bug where it doesnt send a user agent sometimes, you just gotta try again
 
     var videoId = parseInt(req.query.sid) - 1
     if (isNaN(videoId)) return res.status(404).send('');
