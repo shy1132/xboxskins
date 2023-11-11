@@ -90,24 +90,12 @@ async function initialize() {
 initialize()
 
 //code
-//frontend stuff (for browsers)
-app.get('/*', async (req, res) => {
-    var reqPath = req.path
-    if (reqPath === '/') reqPath = '/index.html';
-
-    var file = static.get(reqPath)
-    if (file === undefined) return res.status(404).send('');
-
-    var fileType = path.extname(file.path)
-    res.type(fileType).send(file.content)
-})
-
 //skin downloader
 app.get('/rss/uxdash.php', async (req, res) => { //sends a giant xml of all the skins in the db (this has nothing to do with php but the original website used php)
     logRequest('ux_rss', req)
 
     var items = [ //this will always show at the top, so i put some information here for anyone confused (since its just a giant list of skins)
-        rssEntry(`! unofficial UnleashX skin downloader`, 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg'),
+        rssEntry(`! unofficial UnleashX skin downloader (should work properly again)`, 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg'),
         rssEntry('!! see www.xbox-skins.net in your browser for more information', 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg'),
         rssEntry('!!! ------------------------------------------------------------------------------------------- !!!', 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg')
     ]
@@ -119,9 +107,9 @@ app.get('/rss/uxdash.php', async (req, res) => { //sends a giant xml of all the 
         var fileName = path.basename(file.name, path.extname(file.name))
 
         if (fileName.includes('[NSFW]')) { //every nsfw skin has "[NSFW]" before the name
-            nsfwItems.push(rssEntry(`~${fileName}`, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/thumbs/${file.id}`)) //~ before fileName to shove it down to the bottom, past all the other non nsfw skins
+            nsfwItems.push(rssEntry(`~${fileName}`, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/thumbs/${file.id}.jpg`)) //~ before fileName to shove it down to the bottom, past all the other non nsfw skins
         } else {
-            items.push(rssEntry(fileName, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/thumbs/${file.id}`))
+            items.push(rssEntry(fileName, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/thumbs/${file.id}.jpg`))
         }
     }
 
@@ -144,7 +132,7 @@ app.get('/downloads/skins/:skin', async (req, res) => { //sends the zip file for
     res.send(buffer)
 })
 
-app.get('/downloads/thumbs/:skin', async (req, res) => { //sends a thumbnail of the skin, skins are supposed to have a file in them for this so it reads through the files and tries to find it
+app.get('/downloads/thumbs/:skin', async (req, res) => { //sends a thumbnail of the skin, skins are supposed to have a file in them for this so it reads through the files and tries to find it (img previews NEED an extension to work for some reason)
     logRequest('ux_thumb', req)
 
     var id = parseInt(req.params.skin)
@@ -222,11 +210,22 @@ app.get('/games/sendvid.php', async (req, res) => { //sends a preview of a game 
 })
 
 //misc
+app.get('/*', async (req, res) => { //frontend
+    var reqPath = req.path
+    if (reqPath === '/') reqPath = '/index.html';
+
+    var file = static.get(reqPath)
+    if (file === undefined) return res.status(404).send('');
+
+    var fileType = path.extname(file.path)
+    res.type(fileType).send(file.content)
+})
+
 app.get('/404/:message', (req, res) => { //unleashX will output :message due to it being the text after the last slash
     res.status(404).send('')
 })
 
-app.all('*', (req, res) => { //since its after everything it just 404s shit that isnt in this file/public dir
+app.all('*', async (req, res) => { //catch-all, since its last itll just 404 everything else silently
     res.status(404).send('')
 })
 
