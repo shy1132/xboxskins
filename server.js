@@ -3,7 +3,8 @@ process.on('uncaughtException', function(exception) {
 })
 
 //requires
-const express = require('express')
+const HyperExpress = require('hyper-express')
+const LiveDirectory = require('live-directory')
 const AdmZip = require('adm-zip')
 const fs = require('fs')
 const path = require('path')
@@ -13,17 +14,19 @@ const titleIds = require('./files/titleIds.json')
 if (!fs.existsSync('./files/skins')) return console.log('no skins folder in ./files/skins!');
 if (!fs.existsSync('./files/previews')) return console.log('no previews folder in ./files/previews!');
 
-const app = express()
-
-app.set('trust proxy', true)
-app.use(express.static('public'))
-app.disable('x-powered-by') //disabling some headers for MAXIMUM SPEED...
-app.disable('etag') //(doesnt work in static files, but thats good because static files are for pc, anyways)
+const app = new HyperExpress.Server()
+const static = new LiveDirectory(path.resolve('./public'), {
+    keep: {
+        extensions: ['.html', '.txt', '.jpg']
+    },
+    ignore: (path) => {
+        return path.startsWith('.'); //ignore dotfiles
+    }
+})
 
 //variables
 var skinIndex = []
 var previewIndex = []
-var skinCache = {}
 
 //functions
 function logRequest(endpoint = 'unknown', req) {
@@ -42,14 +45,14 @@ function htmlEncode(str) {
 function rssEntry(title, link, thumb) {
     //validate link and if its invalid, just make it an empty string
     try {
-        if (link) new URL(link)?.href
+        if (link) new URL(link).href
     } catch {
         link = 'http://www.xbox-skins.net/404/error'
     }
 
     //same but for thumbnail
     try {
-        if (thumb) thumb = new URL(thumb)?.href
+        if (thumb) thumb = new URL(thumb).href
     } catch {
         thumb = 'http://www.xbox-skins.net/thumb.jpg'
     }
@@ -57,14 +60,14 @@ function rssEntry(title, link, thumb) {
     return `<item><title>${htmlEncode(title)}</title><link>${link}</link><thumb>${thumb}</thumb></item>`;
 }
 
-async function updateSkinIndexes() {
-    console.log('updating skin index')
-    skinIndex = []
+async function initialize() {
+    console.log('getting list of skins and previews')
 
-    var files = await fs.promises.readdir('./files/skins/')
+    var skinFiles = await fs.promises.readdir('./files/skins/')
+    var previewFiles = await fs.promises.readdir('./files/previews/')
 
-    for (let i = 0; i < files.length; i++) {
-        let name = files[i]
+    for (let i = 0; i < skinFiles.length; i++) {
+        let name = skinFiles[i]
         skinIndex.push({
             name,
             path: path.resolve(`./files/skins/${name}`),
@@ -72,17 +75,8 @@ async function updateSkinIndexes() {
         })
     }
 
-    console.log('finished updating skin index')
-}
-
-async function updatePreviewIndexes() {
-    console.log('updating preview index')
-    previewIndex = []
-
-    var files = await fs.promises.readdir('./files/previews/')
-
-    for (let i = 0; i < files.length; i++) {
-        let name = files[i]
+    for (let i = 0; i < previewFiles.length; i++) {
+        let name = previewFiles[i]
         previewIndex.push({
             name,
             path: path.resolve(`./files/previews/${name}`),
@@ -90,38 +84,24 @@ async function updatePreviewIndexes() {
         })
     }
 
-    console.log('finished updating preview index')
+    console.log('finished indexing skins and previews')
 }
 
-function clearSkinCache() {
-    var expiryDeadline = Date.now()
-    var skinsCleared = 0
-
-    var skinCacheArr = Object.keys(skinCache)
-    if (skinCacheArr.length > 10) {
-        skinsCleared = skinCacheArr.length
-        skinCache = {}; //prevent memory leak by someone who may decide to try it
-        skinCacheArr = [];
-    }
-
-    for (let i = 0; i < skinCacheArr.length; i++) {
-        var entry = skinCache[skinCacheArr[i]]
-        if (expiryDeadline > entry.expires) {
-            delete skinCache[skinCacheArr[i]];
-            skinsCleared++;
-        }
-    }
-    
-    if (skinsCleared > 0) console.log(`cleared cache for ${skinsCleared} skins`)
-}
-
-updateSkinIndexes()
-updatePreviewIndexes()
-setInterval(updateSkinIndexes, 21600000)
-setInterval(updatePreviewIndexes, 21600000)
-setInterval(clearSkinCache, 60000) //just checks every minute to see if any cache needs to be cleared
+initialize()
 
 //code
+//frontend stuff (for browsers)
+app.get('/*', async (req, res) => {
+    var reqPath = req.path
+    if (reqPath === '/') reqPath = '/index.html';
+
+    var file = static.get(reqPath)
+    if (file === undefined) return res.status(404).send('');
+
+    var fileType = path.extname(file.path)
+    res.type(fileType).send(file.content)
+})
+
 //skin downloader
 app.get('/rss/uxdash.php', async (req, res) => { //sends a giant xml of all the skins in the db (this has nothing to do with php but the original website used php)
     logRequest('ux_rss', req)
@@ -148,53 +128,30 @@ app.get('/rss/uxdash.php', async (req, res) => { //sends a giant xml of all the 
     items = items.concat(nsfwItems) //just to make sure that nsfw items are indeed at the bottom (this sorts it as items, nsfwItems)
 
     var xml = `<?xml version='1.0'?><!DOCTYPE rss PUBLIC "-//Netscape Communications//DTD RSS 0.91//E" "http://my.netscape.com/publish/formats/rss-0.91.dtd"><rss version="0.91"><channel><title>www.xbox-skins.net replacement server</title><link>http://www.xbox-skins.net</link><language>en-us</language>${items.join('')}</channel></rss>`
-    res.contentType('text/xml')
+    res.setHeader('Content-Type', 'text/xml')
     res.send(xml)
 })
 
-app.get('/downloads/skins/:skin.zip', async (req, res) => { //sends the zip file for a skin by it's id (obtained from the index of the skin in ux_srss)
+app.get('/downloads/skins/:skin', async (req, res) => { //sends the zip file for a skin by it's id (obtained from the index of the skin in ux_srss)
     logRequest('ux_skin', req)
 
-    if (!req.params.skin) return res.status(404).send('');
-
-    const id = parseInt(req.params.skin)
+    var id = parseInt(req.params.skin) //will remove any extensions
     if (id > skinIndex.length - 1 || id < 0 || isNaN(id)) return res.status(404).send('');
-    
-    if (skinCache[id]?.zip) {
-        skinCache[id] = { ...skinCache[id], expires: Date.now() + 300000 }
-        res.contentType('application/zip')
-        return res.send(skinCache[id].zip);
-    }
 
     var buffer = await fs.promises.readFile(skinIndex[id].path)
-    skinCache[id] = { ...skinCache[id], zip: buffer, expires: Date.now() + 300000 }
-    res.contentType('application/zip')
+
+    res.setHeader('Content-Type', 'application/zip')
     res.send(buffer)
 })
 
 app.get('/downloads/thumbs/:skin', async (req, res) => { //sends a thumbnail of the skin, skins are supposed to have a file in them for this so it reads through the files and tries to find it
     logRequest('ux_thumb', req)
 
-    if (!req.params.skin) return res.status(404).send('');
-
-    const id = parseInt(req.params.skin)
+    var id = parseInt(req.params.skin)
     if (id > skinIndex.length - 1 || id < 0 || isNaN(id)) return res.status(404).send('');
 
-    if (skinCache[id]?.thumbnailFile) {
-        skinCache[id] = { ...skinCache[id], expires: Date.now() + 300000 }
-        if (skinCache[id].thumbnailFile === 'no_thumbnail') return res.status(200).send('');
-        res.contentType(skinCache[id].thumbnailMimeType)
-        return res.send(skinCache[id].thumbnailFile);
-    }
-
-    if (skinCache[id]?.zip) {
-        skinCache[id] = { ...skinCache[id], expires: Date.now() + 300000 }
-        var zip = new AdmZip(skinCache[id].zip)
-    } else {
-        var buffer = await fs.promises.readFile(skinIndex[id].path)
-        skinCache[id] = { ...skinCache[id], zip: buffer, expires: Date.now() + 300000 }
-        var zip = new AdmZip(buffer)
-    }
+    var buffer = await fs.promises.readFile(skinIndex[id].path)
+    var zip = new AdmZip(buffer)
 
     var zipEntries = zip.getEntries()
     var validFormats = ['png', 'jpg', 'jpeg', 'bmp']
@@ -207,9 +164,8 @@ app.get('/downloads/thumbs/:skin', async (req, res) => { //sends a thumbnail of 
 
         if ((entryName.startsWith('preview') || entryName.startsWith('screenshot')) && validFormats.includes(entryExtension)) {
             let thumbnailBuffer = entry.getData()
-            skinCache[id] = { ...skinCache[id], thumbnailFile: thumbnailBuffer, thumbnailMimeType: 'image/' + entryExtension, expires: Date.now() + 300000 }
-            res.contentType('image/' + entryExtension)
-            res.send(entry.getData())
+            res.setHeader('Content-Type', 'image/' + entryExtension)
+            res.send(thumbnailBuffer)
             break;
         } else if (validFormats.includes(entryExtension)) {
             contenders.push(entry)
@@ -219,11 +175,10 @@ app.get('/downloads/thumbs/:skin', async (req, res) => { //sends a thumbnail of 
             let contenderEntry = contenders[0]
             let contenderEntryName = contenderEntry.entryName.toLowerCase().split('/')[contenderEntry.entryName.toLowerCase().split('/').length - 1]
             let contenderEntryExtension = contenderEntryName.split('.')[contenderEntryName.split('.').length - 1]
-            res.contentType('image/' + contenderEntryExtension)
+            res.setHeader('Content-Type', 'image/' + contenderEntryExtension)
             res.send(contenders[0].getData())
             break;
         } else if (i >= Object.values(zipEntries).length - 1) {
-            skinCache[id] = { ...skinCache[id], thumbnailFile: 'no_thumbnail', thumbnailMimeType: 'no_thumbnail', expires: Date.now() + 300000 }
             res.status(200).send('')
             break;
         }
@@ -231,10 +186,11 @@ app.get('/downloads/thumbs/:skin', async (req, res) => { //sends a thumbnail of 
 })
 
 //preview downloader
-app.get('/games/xml/:titleId.xml', async (req, res) => { //sends an xml file from a game's title id
+app.get('/games/xml/:titleId', async (req, res) => { //sends an xml file from a game's title id
     logRequest('ux_game', req)
 
-    var titleId = encodeURIComponent(req.params.titleId.toUpperCase())
+    var titleIdParsed = parseInt(req.params.titleId, 16).toString(16).toUpperCase() //will remove any extensions or anything like that
+    var titleId = encodeURIComponent(titleIdParsed)
     if (titleId.length != 8) return res.status(200).send(''); //200 on these because instead of requesting it to be added (not a feature never will be) itll just say it doesnt exist
     if (isNaN(parseInt(titleId, 16))) return res.status(200).send('');
     if (!titleIds[titleId]) return res.status(200).send('');
@@ -243,19 +199,19 @@ app.get('/games/xml/:titleId.xml', async (req, res) => { //sends an xml file fro
     var videoId = 0
     for (let i = 0; i < previewIndex.length; i++) {
         if (previewIndex[i].name.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim().slice(0, -3) === info.title.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim()) {
-            videoId = i + 1
+            videoId = (i + 1)
         }
     }
 
-    res.contentType('text/xml')
-    res.send(`<gdbase><xbg title="${htmlEncode(info.title)}" decid="${parseInt(titleId, 16)}" hexid="${titleId}" video="${0-(videoId>0)}" vidid="${videoId}"/></gdbase>`)
+    res.setHeader('Content-Type', 'text/xml')
+    res.send(`<gdbase><xbg title="${htmlEncode(info.title)}" decid="${parseInt(titleId, 16)}" hexid="${titleId}" video="${videoId ? -1 : 0}" vidid="${videoId}"/></gdbase>`)
     //res.send(`<gdbase><xbg title="${info.title}" decid="${parseInt(titleid, 16)}" hexid="${titleid}" cover="0" thumb="0" md5="" size="" liveenabled="0" systemlink="0" patchtype="0" players="0" customsoundtracks="0" genre="" esrb="" publisher="" developer="" region="0" rc="0" video="1" vc="0" vidid="${vidid}"/></gdbase>`)
 })
 
 app.get('/games/sendvid.php', async (req, res) => { //sends a preview of a game by it's id
     logRequest('ux_vid', req)
 
-    if (!req.headers['user-agent']) return res.redirect(req.url); //weird unleashx bug
+    if (!req.headers['user-agent']) return res.redirect(req.url); //weird unleashx bug where it doesnt send a user agent sometimes
 
     var videoId = parseInt(req.query.sid) - 1
     if (isNaN(videoId)) return res.status(404).send('');
@@ -274,13 +230,6 @@ app.all('*', (req, res) => { //since its after everything it just 404s shit that
     res.status(404).send('')
 })
 
-app.use((error, req, res, next) => { //error handler so i dont accidentally leak anything somehow/mess with unleashX in a weird way lol
-    console.log(`error on ${req.path}: ${error.message}`)
-    res.status(500).send('')
-})
-
-app.listen(14380, () => {
-    console.log('listening on port 14380')
-})
+app.listen(14380).then(() => console.log('listening on port 14380'))
 
 console.log('starting')
