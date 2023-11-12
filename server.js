@@ -26,6 +26,7 @@ const static = new LiveDirectory(path.resolve('./public'), {
 
 //variables
 var skinIndex = []
+var skinsRssXml = ''
 var previewIndex = []
 
 //functions
@@ -39,13 +40,17 @@ function logRequest(endpoint = 'unknown', req) {
 }
 
 function htmlEncode(str) {
-    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return String(str)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
 }
 
 function rssEntry(title, link, thumb) {
-    //validate link and if its invalid, just make it an empty string
+    //validate link and if its invalid, just make it a placeholder
     try {
-        if (link) new URL(link).href
+        if (link) link = new URL(link).href
     } catch {
         link = 'http://www.xbox-skins.net/404/error'
     }
@@ -85,14 +90,8 @@ async function initialize() {
     }
 
     console.log('finished indexing skins and previews')
-}
 
-initialize()
-
-//code
-//skin downloader
-app.get('/rss/uxdash.php', async (req, res) => { //sends a giant xml of all the skins in the db (this has nothing to do with php but the original website used php)
-    logRequest('ux_rss', req)
+    console.log('compiling skin index to xml for ux_rss endpoint')
 
     var items = [ //this will always show at the top, so i put some information here for anyone confused (since its just a giant list of skins)
         rssEntry(`! unofficial UnleashX skin downloader (should work properly again)`, 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg'),
@@ -107,32 +106,43 @@ app.get('/rss/uxdash.php', async (req, res) => { //sends a giant xml of all the 
         var fileName = path.basename(file.name, path.extname(file.name))
 
         if (fileName.includes('[NSFW]')) { //every nsfw skin has "[NSFW]" before the name
-            nsfwItems.push(rssEntry(`~${fileName}`, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/thumbs/${file.id}.jpg`)) //~ before fileName to shove it down to the bottom, past all the other non nsfw skins
+            nsfwItems.push(rssEntry(`~${fileName}`, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/skinThumbs/${file.id}.jpg`)) //~ before fileName to shove it down to the bottom, past all the other non nsfw skins
         } else {
-            items.push(rssEntry(fileName, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/thumbs/${file.id}.jpg`))
+            items.push(rssEntry(fileName, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/skinThumbs/${file.id}.jpg`))
         }
     }
 
     items = items.concat(nsfwItems) //just to make sure that nsfw items are indeed at the bottom (this sorts it as items, nsfwItems)
+    skinsRssXml = `<?xml version='1.0'?><!DOCTYPE rss PUBLIC "-//Netscape Communications//DTD RSS 0.91//E" "http://my.netscape.com/publish/formats/rss-0.91.dtd"><rss version="0.91"><channel><title>www.xbox-skins.net replacement server</title><link>http://www.xbox-skins.net</link><language>en-us</language>${items.join('')}</channel></rss>`
 
-    var xml = `<?xml version='1.0'?><!DOCTYPE rss PUBLIC "-//Netscape Communications//DTD RSS 0.91//E" "http://my.netscape.com/publish/formats/rss-0.91.dtd"><rss version="0.91"><channel><title>www.xbox-skins.net replacement server</title><link>http://www.xbox-skins.net</link><language>en-us</language>${items.join('')}</channel></rss>`
+    console.log('finished compiling skin index to xml')
+}
+
+initialize()
+
+//code
+//skin downloader
+app.get('/rss/uxdash.php', async (req, res) => { //sends a giant xml of all the skins in the db (this has nothing to do with php but the original website used php)
+    logRequest('ux_rss', req)
+
     res.setHeader('Content-Type', 'text/xml')
-    res.send(xml)
+    res.send(skinsRssXml)
 })
 
 app.get('/downloads/skins/:skin', async (req, res) => { //sends the zip file for a skin by it's id (obtained from the index of the skin in ux_srss)
     logRequest('ux_skin', req)
 
-    var id = parseInt(req.params.skin) //will remove any extensions
+    var id = parseInt(req.params.skin) //will remove any extensions or such
     if (id > skinIndex.length - 1 || id < 0 || isNaN(id)) return res.status(404).send('');
 
-    var buffer = await fs.promises.readFile(skinIndex[id].path)
+    var readStream = fs.createReadStream(skinIndex[id].path)
+    var fileSize = (await fs.promises.stat(skinIndex[id].path)).size
 
     res.setHeader('Content-Type', 'application/zip')
-    res.send(buffer)
+    res.stream(readStream, fileSize)
 })
 
-app.get('/downloads/thumbs/:skin', async (req, res) => { //sends a thumbnail of the skin, skins are supposed to have a file in them for this so it reads through the files and tries to find it (img previews NEED an extension to work for some reason)
+app.get('/downloads/skinThumbs/:skin', async (req, res) => { //sends a thumbnail of the skin, skins are supposed to have a file in them for this so it reads through the files and tries to find it (img previews NEED a .jpg extension to work for some reason)
     logRequest('ux_thumb', req)
 
     var id = parseInt(req.params.skin)
@@ -140,36 +150,40 @@ app.get('/downloads/thumbs/:skin', async (req, res) => { //sends a thumbnail of 
 
     var buffer = await fs.promises.readFile(skinIndex[id].path)
     var zip = new AdmZip(buffer)
-
     var zipEntries = zip.getEntries()
     var validFormats = ['png', 'jpg', 'jpeg', 'bmp']
     var contenders = []
 
-    for (let i = 0; i < Object.values(zipEntries).length; i++) {
-        let entry = Object.values(zipEntries)[i]
-        let entryName = entry.entryName.toLowerCase().split('/')[entry.entryName.toLowerCase().split('/').length - 1]
-        let entryExtension = entryName.split('.')[entryName.split('.').length - 1]
-
-        if ((entryName.startsWith('preview') || entryName.startsWith('screenshot')) && validFormats.includes(entryExtension)) {
-            let thumbnailBuffer = entry.getData()
-            res.setHeader('Content-Type', 'image/' + entryExtension)
-            res.send(thumbnailBuffer)
-            break;
-        } else if (validFormats.includes(entryExtension)) {
-            contenders.push(entry)
+    for (let entry of Object.values(zipEntries)) {
+        let entryName = path.basename(entry.entryName.toLowerCase())
+        let entryExtension = path.extname(entryName).slice(1)
+    
+        if (validFormats.includes(entryExtension)) {
+            if (entryName.startsWith('preview') || entryName.startsWith('screenshot')) {
+                entry.getDataAsync((data, err) => {
+                    if (err) return res.status(200).send('');
+                    res.setHeader('Content-Type', 'image/' + entryExtension)
+                    res.send(data)
+                })
+                return;
+            } else {
+                contenders.push(entry)
+            }
         }
+    }
 
-        if (i >= Object.values(zipEntries).length - 1 && contenders[0]) {
-            let contenderEntry = contenders[0]
-            let contenderEntryName = contenderEntry.entryName.toLowerCase().split('/')[contenderEntry.entryName.toLowerCase().split('/').length - 1]
-            let contenderEntryExtension = contenderEntryName.split('.')[contenderEntryName.split('.').length - 1]
+    if (contenders.length > 0) {
+        var contenderEntry = contenders[0]
+        var contenderEntryName = path.basename(contenderEntry.entryName.toLowerCase())
+        var contenderEntryExtension = path.extname(contenderEntryName).slice(1)
+
+        contenderEntry.getDataAsync((data, err) => {
+            if (err) return res.status(200).send('');
             res.setHeader('Content-Type', 'image/' + contenderEntryExtension)
-            res.send(contenders[0].getData())
-            break;
-        } else if (i >= Object.values(zipEntries).length - 1) {
-            res.status(200).send('')
-            break;
-        }
+            res.send(data)
+        })
+    } else {
+        res.status(200).send('')
     }
 })
 
@@ -188,12 +202,13 @@ app.get('/games/xml/:titleId', async (req, res) => { //sends an xml file from a 
     for (let i = 0; i < previewIndex.length; i++) {
         if (previewIndex[i].name.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim().slice(0, -3) === info.title.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim()) {
             videoId = (i + 1)
+            break;
         }
     }
 
     res.setHeader('Content-Type', 'text/xml')
     res.send(`<gdbase><xbg title="${htmlEncode(info.title)}" decid="${parseInt(titleId, 16)}" hexid="${titleId}" video="${videoId ? -1 : 0}" vidid="${videoId}"/></gdbase>`)
-    //res.send(`<gdbase><xbg title="${info.title}" decid="${parseInt(titleid, 16)}" hexid="${titleid}" cover="0" thumb="0" md5="" size="" liveenabled="0" systemlink="0" patchtype="0" players="0" customsoundtracks="0" genre="" esrb="" publisher="" developer="" region="0" rc="0" video="1" vc="0" vidid="${vidid}"/></gdbase>`)
+    //res.send(`<gdbase><xbg title="${info.title}" decid="${parseInt(titleid, 16)}" hexid="${titleid}" cover="0" thumb="0" md5="" size="" liveenabled="0" systemlink="0" patchtype="0" players="0" customsoundtracks="0" genre="" esrb="" publisher="" developer="" region="0" rc="0" video="1" vc="0" vidid="0"/></gdbase>`)
 })
 
 app.get('/games/sendvid.php', async (req, res) => { //sends a preview of a game by it's id
@@ -205,8 +220,11 @@ app.get('/games/sendvid.php', async (req, res) => { //sends a preview of a game 
     if (isNaN(videoId)) return res.status(404).send('');
     if (!previewIndex[videoId]) return res.status(404).send('');
 
-    var buffer = await fs.promises.readFile(previewIndex[videoId].path)
-    res.send(buffer)
+    var fileSize = (await fs.promises.stat(previewIndex[videoId].path)).size
+    var readStream = fs.createReadStream(previewIndex[videoId].path)
+
+    res.setHeader('Content-Type', 'video/x-ms-wmv')
+    res.stream(readStream, fileSize)
 })
 
 //misc
