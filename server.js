@@ -195,20 +195,23 @@ app.get('/games/xml/:titleId', async (req, res) => { //sends an xml file from a 
     var titleId = encodeURIComponent(titleIdParsed)
     if (titleId.length != 8) return res.status(200).send(''); //200 on these because instead of requesting it to be added (not a feature never will be) itll just say it doesnt exist
     if (isNaN(parseInt(titleId, 16))) return res.status(200).send('');
-    if (!titleIds[titleId]) return res.status(200).send('');
+    if (!titleIds[titleId] || !titleIds[titleId].title || !titleIds[titleId].tid) return res.status(200).send('');
 
     var info = titleIds[titleId]
     var videoId = 0
     for (let i = 0; i < previewIndex.length; i++) {
-        if (previewIndex[i].name.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim().slice(0, -3) === info.title.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim()) {
+        let cleanSourceName = previewIndex[i].name.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim().slice(0, -3)
+        let cleanTargetName = info.title.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim()
+
+        if (cleanSourceName === cleanTargetName) {
             videoId = (i + 1)
             break;
         }
     }
 
     res.setHeader('Content-Type', 'text/xml')
-    res.send(`<gdbase><xbg title="${htmlEncode(info.title)}" decid="${parseInt(titleId, 16)}" hexid="${titleId}" video="${videoId ? -1 : 0}" vidid="${videoId}"/></gdbase>`)
-    //res.send(`<gdbase><xbg title="${info.title}" decid="${parseInt(titleid, 16)}" hexid="${titleid}" cover="0" thumb="0" md5="" size="" liveenabled="0" systemlink="0" patchtype="0" players="0" customsoundtracks="0" genre="" esrb="" publisher="" developer="" region="0" rc="0" video="1" vc="0" vidid="0"/></gdbase>`)
+    res.send(`<gdbase><xbg title="${htmlEncode(info.title)}" decid="${parseInt(info.tid, 16)}" hexid="${info.tid}" video="${videoId ? -1 : 0}" vidid="${videoId}"/></gdbase>`)
+    //res.send(`<gdbase><xbg title="title" decid="00000000" hexid="00000000" cover="0" thumb="0" md5="" size="" liveenabled="0" systemlink="0" patchtype="0" players="0" customsoundtracks="0" genre="" esrb="" publisher="" developer="" region="0" rc="0" video="1" vc="0" vidid="0"/></gdbase>`)
 })
 
 app.get('/games/sendvid.php', async (req, res) => { //sends a preview of a game by it's id
