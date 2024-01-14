@@ -26,6 +26,7 @@ const static = new LiveDirectory(path.resolve('./public'), {
 })
 
 //variables
+const baseUrl = 'http://www.xbox-skins.net'
 var skinIndex = []
 var skinsRssXml = ''
 var previewIndex = []
@@ -65,14 +66,14 @@ function rssEntry(title, link, thumb) {
     try {
         if (link) link = new URL(link).href
     } catch {
-        link = 'http://www.xbox-skins.net/404/error'
+        link = baseUrl + '/404/error'
     }
 
     //same but for thumbnail
     try {
         if (thumb) thumb = new URL(thumb).href
     } catch {
-        thumb = 'http://www.xbox-skins.net/thumb.jpg'
+        thumb = baseUrl + '/thumb.jpg'
     }
 
     return `<item><title>${htmlEncode(title)}</title><link>${link}</link><thumb>${thumb}</thumb></item>`;
@@ -107,9 +108,9 @@ async function initialize() {
     console.log('compiling skin index to xml for ux_rss endpoint')
 
     var items = [ //this will always show at the top, so i put some information here for anyone confused (since its just a giant list of skins)
-        rssEntry(`! unofficial UnleashX skin downloader (should work properly again)`, 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg'),
-        rssEntry('!! see www.xbox-skins.net in your browser for more information', 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg'),
-        rssEntry('!!! ------------------------------------------------------------------------------------------- !!!', 'http://www.xbox-skins.net/404/this_is_not_a_skin', 'http://www.xbox-skins.net/thumb.jpg')
+        rssEntry('! unofficial UnleashX skin downloader', `${baseUrl}/404/this_is_not_a_skin`, `${baseUrl}/thumb.jpg`),
+        rssEntry('!! see www.xbox-skins.net in your browser for more information', `${baseUrl}/404/this_is_not_a_skin`, `${baseUrl}/thumb.jpg`),
+        rssEntry('!!! ------------------------------------------------------------------------------------------- !!!', `${baseUrl}/404/this_is_not_a_skin`, `${baseUrl}/thumb.jpg`)
     ]
 
     var nsfwItems = []
@@ -118,10 +119,10 @@ async function initialize() {
         let file = skinIndex[i]
         let fileName = path.basename(file.name, path.extname(file.name))
 
-        if (fileName.includes('[NSFW]')) { //every nsfw skin has "[NSFW]" before the name
-            nsfwItems.push(rssEntry(`~${fileName}`, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/skinThumbs/${file.id}.jpg`)) //~ before fileName to shove it down to the bottom, past all the other non nsfw skins
+        if (fileName.includes('[NSFW]')) { //every nsfw skin has "[NSFW]" after the name
+            nsfwItems.push(rssEntry(`~${fileName}`, `${baseUrl}/downloads/skins/${file.id}.zip`, `${baseUrl}/downloads/skinThumbs/${file.id}.jpg`)) //~ before fileName to shove it down to the bottom, past all the other non nsfw skins
         } else {
-            items.push(rssEntry(fileName, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/skinThumbs/${file.id}.jpg`))
+            items.push(rssEntry(fileName, `${baseUrl}/downloads/skins/${file.id}.zip`, `${baseUrl}/downloads/skinThumbs/${file.id}.jpg`))
         }
     }
 
@@ -161,39 +162,55 @@ app.get('/downloads/skinThumbs/:skin', async (req, res) => { //sends a thumbnail
     var id = parseInt(req.params.skin)
     if (id > skinIndex.length - 1 || id < 0 || isNaN(id)) return res.status(404).send('');
 
+    var formats = {
+        'png': 'image/png',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'bmp': 'image/bmp'
+    }
+
+    var formatsArr = Object.keys(formats)
+
     var buffer = await fs.promises.readFile(skinIndex[id].path)
     var zip = new AdmZip(buffer)
     var zipEntries = zip.getEntries()
-    var validFormats = ['png', 'jpg', 'jpeg', 'bmp']
+
     var contenders = []
+    var foundPreview = false
 
     for (let entry of Object.values(zipEntries)) {
         let entryName = path.basename(entry.entryName.toLowerCase())
         let entryExtension = path.extname(entryName).slice(1)
 
-        if (validFormats.includes(entryExtension)) {
+        if (formatsArr.includes(entryExtension)) {
             if (entryName.startsWith('preview') || entryName.startsWith('screenshot')) {
+                foundPreview = true;
+
                 entry.getDataAsync((data, err) => {
                     if (err) return res.status(200).send('');
-                    res.setHeader('Content-Type', 'image/' + entryExtension)
+                    res.setHeader('Content-Type', formats[entryExtension])
                     res.send(data)
                 })
 
-                break; //this runs at same time as getDataAsync, so it won't mess up even though getDataAsync isn't awaited (can't be)
+                break;
             } else {
                 contenders.push(entry)
             }
         }
     }
 
-    if (contenders.length > 0) {
-        let contenderEntry = contenders[0]
-        let contenderEntryName = path.basename(contenderEntry.entryName.toLowerCase())
+    if (contenders.length > 0 && !foundPreview) {
+        let largestContenderEntry = contenders.reduce((maxSizeContender, currentContender) => { //find the largest one (most likely to be a preview or a background of the skin which is sort of a preview)
+            let currentSize = currentContender.header.size
+            return currentSize > maxSizeContender.header.size ? currentContender : maxSizeContender;
+        }, contenders[0])
+
+        let contenderEntryName = path.basename(largestContenderEntry.entryName.toLowerCase())
         let contenderEntryExtension = path.extname(contenderEntryName).slice(1)
 
-        contenderEntry.getDataAsync((data, err) => {
+        largestContenderEntry.getDataAsync((data, err) => {
             if (err) return res.status(200).send('');
-            res.setHeader('Content-Type', 'image/' + contenderEntryExtension)
+            res.setHeader('Content-Type', formats[contenderEntryExtension])
             res.send(data)
         })
     } else {
