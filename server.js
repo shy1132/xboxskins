@@ -9,6 +9,7 @@ const AdmZip = require('adm-zip')
 const fs = require('fs')
 const path = require('path')
 const titleIds = require('./files/titleIds.json')
+const config = require('./config.json')
 
 //setups
 if (!fs.existsSync('./files/skins')) return console.log('no skins folder in ./files/skins!');
@@ -31,11 +32,23 @@ var previewIndex = []
 
 //functions
 function logRequest(endpoint = 'unknown', req) {
-    var ip = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[req.headers['x-forwarded-for'].split(',').length - 1].trim() : 'unknown'; //if there is a forwarded for ip sent by the reverse proxy, parse it (apache usually puts a comma if you add that header manually) to only return the ip
-    var xbox = req.headers['user-agent']?.startsWith('Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1'); //if the ua starts with this, it's unleashX
+    var origin;
+    if (config.cloudflareMode) {
+        let ip = req.headers['cf-connecting-ip'] || 'unknown';
+        let countryCode = req.headers['cf-ipcountry'] || 'unknown';
+        origin = `${ip} (${countryCode})`
+    } else if (req.headers['x-forwarded-for']) {
+        let forwardedFor = req.headers['x-forwarded-for']
+        let forwardedForSplit = forwardedFor.split(',')
+        origin = forwardedForSplit[forwardedForSplit.length - 1].trim() //parse the forwarded for ip (apache usually puts a comma if the client adds that header manually, so we get the first ip that the reverse proxy sent)
+    } else {
+        origin = 'unknown';
+    }
+
+    var onXbox = req.headers['user-agent']?.startsWith('Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1'); //if the ua starts with this, it's unleashX
     var date = new Date().toISOString()
 
-    console.log(`[${date}] ${endpoint} | ${xbox ? 'on xbox' : 'not on xbox'} | from ${ip}`)
+    console.log(`[${date}] ${endpoint} | ${onXbox ? 'on xbox' : 'not on xbox'} | from ${origin}`)
     return true;
 }
 
@@ -102,8 +115,8 @@ async function initialize() {
     var nsfwItems = []
 
     for (let i = 0; i < skinIndex.length; i++) {
-        var file = skinIndex[i]
-        var fileName = path.basename(file.name, path.extname(file.name))
+        let file = skinIndex[i]
+        let fileName = path.basename(file.name, path.extname(file.name))
 
         if (fileName.includes('[NSFW]')) { //every nsfw skin has "[NSFW]" before the name
             nsfwItems.push(rssEntry(`~${fileName}`, `http://www.xbox-skins.net/downloads/skins/${file.id}.zip`, `http://www.xbox-skins.net/downloads/skinThumbs/${file.id}.jpg`)) //~ before fileName to shove it down to the bottom, past all the other non nsfw skins
@@ -129,7 +142,7 @@ app.get('/rss/uxdash.php', async (req, res) => { //sends a giant xml of all the 
     res.send(skinsRssXml)
 })
 
-app.get('/downloads/skins/:skin', async (req, res) => { //sends the zip file for a skin by it's id (obtained from the index of the skin in ux_srss)
+app.get('/downloads/skins/:skin', async (req, res) => { //sends the zip file for a skin by it's id (obtained from the index of the skin in ux_rss)
     logRequest('ux_skin', req)
 
     var id = parseInt(req.params.skin) //will remove any extensions or such
@@ -157,7 +170,7 @@ app.get('/downloads/skinThumbs/:skin', async (req, res) => { //sends a thumbnail
     for (let entry of Object.values(zipEntries)) {
         let entryName = path.basename(entry.entryName.toLowerCase())
         let entryExtension = path.extname(entryName).slice(1)
-    
+
         if (validFormats.includes(entryExtension)) {
             if (entryName.startsWith('preview') || entryName.startsWith('screenshot')) {
                 entry.getDataAsync((data, err) => {
@@ -165,7 +178,8 @@ app.get('/downloads/skinThumbs/:skin', async (req, res) => { //sends a thumbnail
                     res.setHeader('Content-Type', 'image/' + entryExtension)
                     res.send(data)
                 })
-                return;
+
+                break; //this runs at same time as getDataAsync, so it won't mess up even though getDataAsync isn't awaited (can't be)
             } else {
                 contenders.push(entry)
             }
@@ -173,9 +187,9 @@ app.get('/downloads/skinThumbs/:skin', async (req, res) => { //sends a thumbnail
     }
 
     if (contenders.length > 0) {
-        var contenderEntry = contenders[0]
-        var contenderEntryName = path.basename(contenderEntry.entryName.toLowerCase())
-        var contenderEntryExtension = path.extname(contenderEntryName).slice(1)
+        let contenderEntry = contenders[0]
+        let contenderEntryName = path.basename(contenderEntry.entryName.toLowerCase())
+        let contenderEntryExtension = path.extname(contenderEntryName).slice(1)
 
         contenderEntry.getDataAsync((data, err) => {
             if (err) return res.status(200).send('');
@@ -217,7 +231,7 @@ app.get('/games/xml/:titleId', async (req, res) => { //sends an xml file from a 
 app.get('/games/sendvid.php', async (req, res) => { //sends a preview of a game by it's id
     logRequest('ux_vid', req)
 
-    if (!req.headers['user-agent']) return res.redirect(req.url); //weird unleashx bug where it doesnt send a user agent sometimes, you just gotta try again
+    if (!req.headers['user-agent']) return res.redirect(req.url); //weird unleashx bug where it doesnt send request with a user agent sometimes and also wont do anything with the response, you just gotta try again
 
     var videoId = parseInt(req.query.sid) - 1
     if (isNaN(videoId)) return res.status(404).send('');
