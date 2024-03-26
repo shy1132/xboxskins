@@ -1,4 +1,4 @@
-process.on('uncaughtException', function(exception) {
+process.on('uncaughtException', function (exception) {
     console.log(exception.stack)
 })
 
@@ -27,13 +27,13 @@ const static = new LiveDirectory(path.resolve('./public'), {
 
 //variables
 const baseUrl = 'http://www.xbox-skins.net'
-var skinIndex = []
-var skinsRssXml = ''
-var previewIndex = []
+let skinIndex = []
+let skinsRssXml = ''
+let previewIndex = []
 
 //functions
 function logRequest(endpoint = 'unknown', req) {
-    var origin;
+    let origin;
     if (config.cloudflareMode) {
         let ip = req.headers['cf-connecting-ip'] || 'unknown';
         let countryCode = req.headers['cf-ipcountry'] || 'unknown';
@@ -46,8 +46,8 @@ function logRequest(endpoint = 'unknown', req) {
         origin = 'unknown';
     }
 
-    var onXbox = req.headers['user-agent']?.startsWith('Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1'); //if the ua starts with this, it's unleashX
-    var date = new Date().toISOString()
+    let onXbox = req.headers['user-agent']?.startsWith('Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1'); //if the ua starts with this, it's unleashX
+    let date = new Date().toISOString()
 
     console.log(`[${date}] ${endpoint} | ${onXbox ? 'on xbox' : 'not on xbox'} | from ${origin}`)
     return true;
@@ -55,10 +55,10 @@ function logRequest(endpoint = 'unknown', req) {
 
 function htmlEncode(str) {
     return String(str)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;');
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
 }
 
 function rssEntry(title, link, thumb) {
@@ -82,8 +82,8 @@ function rssEntry(title, link, thumb) {
 async function initialize() {
     console.log('getting list of skins and previews')
 
-    var skinFiles = await fs.promises.readdir('./files/skins/')
-    var previewFiles = await fs.promises.readdir('./files/previews/')
+    let skinFiles = await fs.promises.readdir('./files/skins/')
+    let previewFiles = await fs.promises.readdir('./files/previews/')
 
     for (let i = 0; i < skinFiles.length; i++) {
         let name = skinFiles[i]
@@ -107,13 +107,13 @@ async function initialize() {
 
     console.log('compiling skin index to xml for ux_rss endpoint')
 
-    var items = [ //this will always show at the top, so i put some information here for anyone confused (since its just a giant list of skins)
+    let items = [ //this will always show at the top, so i put some information here for anyone confused (since its just a giant list of skins)
         rssEntry('! unofficial UnleashX skin downloader', `${baseUrl}/404/this_is_not_a_skin`, `${baseUrl}/thumb.jpg`),
         rssEntry('!! see www.xbox-skins.net in your browser for more information', `${baseUrl}/404/this_is_not_a_skin`, `${baseUrl}/thumb.jpg`),
         rssEntry('!!! ------------------------------------------------------------------------------------------- !!!', `${baseUrl}/404/this_is_not_a_skin`, `${baseUrl}/thumb.jpg`)
     ]
 
-    var nsfwItems = []
+    let nsfwItems = []
 
     for (let i = 0; i < skinIndex.length; i++) {
         let file = skinIndex[i]
@@ -146,11 +146,11 @@ app.get('/rss/uxdash.php', async (req, res) => { //sends a giant xml of all the 
 app.get('/downloads/skins/:skin', async (req, res) => { //sends the zip file for a skin by it's id (obtained from the index of the skin in ux_rss)
     logRequest('ux_skin', req)
 
-    var id = parseInt(req.params.skin) //will remove any extensions or such
+    let id = parseInt(req.params.skin) //will remove any extensions or such
     if (id > skinIndex.length - 1 || id < 0 || isNaN(id)) return res.status(404).send('');
 
-    var readStream = fs.createReadStream(skinIndex[id].path)
-    var fileSize = (await fs.promises.stat(skinIndex[id].path)).size
+    let readStream = fs.createReadStream(skinIndex[id].path)
+    let fileSize = (await fs.promises.stat(skinIndex[id].path)).size
 
     res.setHeader('Content-Type', 'application/zip')
     res.stream(readStream, fileSize)
@@ -159,24 +159,24 @@ app.get('/downloads/skins/:skin', async (req, res) => { //sends the zip file for
 app.get('/downloads/skinThumbs/:skin', async (req, res) => { //sends a thumbnail of the skin, skins are supposed to have a file in them for this so it reads through the files and tries to find it (img previews NEED a .jpg extension to work for some reason)
     logRequest('ux_thumb', req)
 
-    var id = parseInt(req.params.skin)
+    let id = parseInt(req.params.skin)
     if (id > skinIndex.length - 1 || id < 0 || isNaN(id)) return res.status(404).send('');
 
-    var formats = {
+    let formats = {
         'png': 'image/png',
         'jpg': 'image/jpeg',
         'jpeg': 'image/jpeg',
         'bmp': 'image/bmp'
     }
 
-    var formatsArr = Object.keys(formats)
+    let formatsArr = Object.keys(formats)
 
-    var buffer = await fs.promises.readFile(skinIndex[id].path)
-    var zip = new AdmZip(buffer)
-    var zipEntries = zip.getEntries()
+    let buffer = await fs.promises.readFile(skinIndex[id].path)
+    let zip = new AdmZip(buffer)
+    let zipEntries = zip.getEntries()
 
-    var contenders = []
-    var foundPreview = false
+    let contenders = []
+    let foundPreview = false
 
     for (let entry of Object.values(zipEntries)) {
         let entryName = path.basename(entry.entryName.toLowerCase())
@@ -222,14 +222,14 @@ app.get('/downloads/skinThumbs/:skin', async (req, res) => { //sends a thumbnail
 app.get('/games/xml/:titleId', async (req, res) => { //sends an xml file from a game's title id
     logRequest('ux_game', req)
 
-    var titleIdParsed = parseInt(req.params.titleId, 16).toString(16).toUpperCase() //will remove any extensions or anything like that
-    var titleId = encodeURIComponent(titleIdParsed)
+    let titleIdParsed = parseInt(req.params.titleId, 16).toString(16).toUpperCase() //will remove any extensions or anything like that
+    let titleId = encodeURIComponent(titleIdParsed)
     if (titleId.length != 8) return res.status(200).send(''); //200 on these because instead of requesting it to be added (not a feature never will be) itll just say it doesnt exist
     if (isNaN(parseInt(titleId, 16))) return res.status(200).send('');
     if (!titleIds[titleId] || !titleIds[titleId].title || !titleIds[titleId].tid) return res.status(200).send('');
 
-    var info = titleIds[titleId]
-    var videoId = 0
+    let info = titleIds[titleId]
+    let videoId = 0
     for (let i = 0; i < previewIndex.length; i++) {
         let cleanSourceName = previewIndex[i].name.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim().slice(0, -3)
         let cleanTargetName = info.title.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim()
@@ -250,12 +250,12 @@ app.get('/games/sendvid.php', async (req, res) => { //sends a preview of a game 
 
     if (!req.headers['user-agent']) return res.redirect(req.url); //weird unleashx bug where it doesnt send request with a user agent sometimes and also wont do anything with the response, you just gotta try again
 
-    var videoId = parseInt(req.query.sid) - 1
+    let videoId = parseInt(req.query.sid) - 1
     if (isNaN(videoId)) return res.status(404).send('');
     if (!previewIndex[videoId]) return res.status(404).send('');
 
-    var fileSize = (await fs.promises.stat(previewIndex[videoId].path)).size
-    var readStream = fs.createReadStream(previewIndex[videoId].path)
+    let fileSize = (await fs.promises.stat(previewIndex[videoId].path)).size
+    let readStream = fs.createReadStream(previewIndex[videoId].path)
 
     res.setHeader('Content-Type', 'video/x-ms-wmv')
     res.stream(readStream, fileSize)
@@ -263,13 +263,13 @@ app.get('/games/sendvid.php', async (req, res) => { //sends a preview of a game 
 
 //misc
 app.get('/*', async (req, res) => { //frontend
-    var reqPath = req.path
+    let reqPath = req.path
     if (reqPath === '/') reqPath = '/index.html';
 
-    var file = static.get(reqPath)
+    let file = static.get(reqPath)
     if (file === undefined) return res.status(404).send('');
 
-    var fileType = path.extname(file.path)
+    let fileType = path.extname(file.path)
     res.type(fileType).send(file.content)
 })
 
