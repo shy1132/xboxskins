@@ -1,7 +1,3 @@
-process.on('uncaughtException', function (exception) {
-    console.log(exception.stack)
-})
-
 //requires
 const HyperExpress = require('hyper-express')
 const LiveDirectory = require('live-directory')
@@ -136,141 +132,171 @@ initialize()
 
 //code
 //skin downloader
-app.get('/rss/uxdash.php', async (req, res) => { //sends a giant xml of all the skins in the db (this has nothing to do with php but the original website used php)
-    logRequest('ux_rss', req)
+app.get('/rss/uxdash.php', (req, res) => { //sends a giant xml of all the skins in the db (this has nothing to do with php but the original website used php)
+    try {
+        logRequest('ux_rss', req)
 
-    res.setHeader('Content-Type', 'text/xml')
-    res.send(skinsRssXml)
+        res.setHeader('Content-Type', 'text/xml')
+        res.send(skinsRssXml)
+    } catch (err) {
+        console.error('error in ux_rss:', err)
+        res.status(500).send('')
+    }
 })
 
 app.get('/downloads/skins/:skin', async (req, res) => { //sends the zip file for a skin by it's id (obtained from the index of the skin in ux_rss)
-    logRequest('ux_skin', req)
+    try {
+        logRequest('ux_skin', req)
 
-    let id = parseInt(req.params.skin) //will remove any extensions or such
-    if (id > skinIndex.length - 1 || id < 0 || isNaN(id)) return res.status(404).send('');
-
-    let readStream = fs.createReadStream(skinIndex[id].path)
-    let fileSize = (await fs.promises.stat(skinIndex[id].path)).size
-
-    res.setHeader('Content-Type', 'application/zip')
-    res.stream(readStream, fileSize)
+        let id = parseInt(req.params.skin) //will remove any extensions or such
+        if (id > skinIndex.length - 1 || id < 0 || isNaN(id)) return res.status(404).send('');
+    
+        let readStream = fs.createReadStream(skinIndex[id].path)
+        let fileSize = (await fs.promises.stat(skinIndex[id].path)).size
+    
+        res.setHeader('Content-Type', 'application/zip')
+        res.stream(readStream, fileSize)
+    } catch (err) {
+        console.error('error in ux_skin:', err)
+        res.status(500).send('')
+    }
 })
 
 app.get('/downloads/skinThumbs/:skin', async (req, res) => { //sends a thumbnail of the skin, skins are supposed to have a file in them for this so it reads through the files and tries to find it (img previews NEED a .jpg extension to work for some reason)
-    logRequest('ux_thumb', req)
+    try {
+        logRequest('ux_thumb', req)
 
-    let id = parseInt(req.params.skin)
-    if (id > skinIndex.length - 1 || id < 0 || isNaN(id)) return res.status(404).send('');
-
-    let formats = {
-        'png': 'image/png',
-        'jpg': 'image/jpeg',
-        'jpeg': 'image/jpeg',
-        'bmp': 'image/bmp'
-    }
-
-    let formatsArr = Object.keys(formats)
-
-    let buffer = await fs.promises.readFile(skinIndex[id].path)
-    let zip = new AdmZip(buffer)
-    let zipEntries = zip.getEntries()
-
-    let contenders = []
-    let foundPreview = false
-
-    for (let entry of Object.values(zipEntries)) {
-        let entryName = path.basename(entry.entryName.toLowerCase())
-        let entryExtension = path.extname(entryName).slice(1)
-
-        if (formatsArr.includes(entryExtension)) {
-            if (entryName.startsWith('preview') || entryName.startsWith('screenshot')) {
-                foundPreview = true;
-
-                entry.getDataAsync((data, err) => {
-                    if (err) return res.status(200).send('');
-                    res.setHeader('Content-Type', formats[entryExtension])
-                    res.send(data)
-                })
-
-                break;
-            } else {
-                contenders.push(entry)
+        let id = parseInt(req.params.skin)
+        if (id > skinIndex.length - 1 || id < 0 || isNaN(id)) return res.status(404).send('');
+    
+        let formats = {
+            'png': 'image/png',
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'bmp': 'image/bmp'
+        }
+    
+        let formatsArr = Object.keys(formats)
+    
+        let buffer = await fs.promises.readFile(skinIndex[id].path)
+        let zip = new AdmZip(buffer)
+        let zipEntries = zip.getEntries()
+    
+        let contenders = []
+        let foundPreview = false
+    
+        for (let entry of Object.values(zipEntries)) {
+            let entryName = path.basename(entry.entryName.toLowerCase())
+            let entryExtension = path.extname(entryName).slice(1)
+    
+            if (formatsArr.includes(entryExtension)) {
+                if (entryName.startsWith('preview') || entryName.startsWith('screenshot')) {
+                    foundPreview = true;
+    
+                    entry.getDataAsync((data, err) => {
+                        if (err) return res.status(200).send('');
+                        res.setHeader('Content-Type', formats[entryExtension])
+                        res.send(data)
+                    })
+    
+                    break;
+                } else {
+                    contenders.push(entry)
+                }
             }
         }
-    }
-
-    if (contenders.length > 0 && !foundPreview) {
-        let largestContenderEntry = contenders.reduce((maxSizeContender, currentContender) => { //find the largest one (most likely to be a preview or a background of the skin which is sort of a preview)
-            let currentSize = currentContender.header.size
-            return currentSize > maxSizeContender.header.size ? currentContender : maxSizeContender;
-        }, contenders[0])
-
-        let contenderEntryName = path.basename(largestContenderEntry.entryName.toLowerCase())
-        let contenderEntryExtension = path.extname(contenderEntryName).slice(1)
-
-        largestContenderEntry.getDataAsync((data, err) => {
-            if (err) return res.status(200).send('');
-            res.setHeader('Content-Type', formats[contenderEntryExtension])
-            res.send(data)
-        })
-    } else {
-        res.status(200).send('')
+    
+        if (contenders.length > 0 && !foundPreview) {
+            let largestContenderEntry = contenders.reduce((maxSizeContender, currentContender) => { //find the largest one (most likely to be a preview or a background of the skin which is sort of a preview)
+                let currentSize = currentContender.header.size
+                return currentSize > maxSizeContender.header.size ? currentContender : maxSizeContender;
+            }, contenders[0])
+    
+            let contenderEntryName = path.basename(largestContenderEntry.entryName.toLowerCase())
+            let contenderEntryExtension = path.extname(contenderEntryName).slice(1)
+    
+            largestContenderEntry.getDataAsync((data, err) => {
+                if (err) return res.status(200).send('');
+                res.setHeader('Content-Type', formats[contenderEntryExtension])
+                res.send(data)
+            })
+        } else {
+            res.status(200).send('')
+        }
+    } catch (err) {
+        console.error('error in ux_thumb:', err)
+        res.status(500).send('')
     }
 })
 
 //preview downloader
 app.get('/games/xml/:titleId', async (req, res) => { //sends an xml file from a game's title id
-    logRequest('ux_game', req)
+    try {
+        logRequest('ux_game', req)
 
-    let titleIdParsed = parseInt(req.params.titleId, 16).toString(16).toUpperCase() //will remove any extensions or anything like that
-    let titleId = encodeURIComponent(titleIdParsed)
-    if (titleId.length != 8) return res.status(200).send(''); //200 on these because instead of requesting it to be added (not a feature never will be) itll just say it doesnt exist
-    if (isNaN(parseInt(titleId, 16))) return res.status(200).send('');
-    if (!titleIds[titleId] || !titleIds[titleId].title || !titleIds[titleId].tid) return res.status(200).send('');
-
-    let info = titleIds[titleId]
-    let videoId = 0
-    for (let i = 0; i < previewIndex.length; i++) {
-        let cleanSourceName = previewIndex[i].name.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim().slice(0, -3)
-        let cleanTargetName = info.title.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim()
-
-        if (cleanSourceName === cleanTargetName) {
-            videoId = (i + 1)
-            break;
+        let titleIdParsed = parseInt(req.params.titleId, 16).toString(16).toUpperCase() //will remove any extensions or anything like that
+        let titleId = encodeURIComponent(titleIdParsed)
+        if (titleId.length != 8) return res.status(200).send(''); //200 on these because instead of requesting it to be added (not a feature never will be) itll just say it doesnt exist
+        if (isNaN(parseInt(titleId, 16))) return res.status(200).send('');
+        if (!titleIds[titleId] || !titleIds[titleId].title || !titleIds[titleId].tid) return res.status(200).send('');
+    
+        let info = titleIds[titleId]
+        let videoId = 0
+        for (let i = 0; i < previewIndex.length; i++) {
+            let cleanSourceName = previewIndex[i].name.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim().slice(0, -3)
+            let cleanTargetName = info.title.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim()
+    
+            if (cleanSourceName === cleanTargetName) {
+                videoId = (i + 1)
+                break;
+            }
         }
+    
+        res.setHeader('Content-Type', 'text/xml')
+        res.send(`<gdbase><xbg title="${htmlEncode(info.title)}" decid="${parseInt(info.tid, 16)}" hexid="${info.tid}" video="${videoId ? -1 : 0}" vidid="${videoId}"/></gdbase>`)
+        //res.send(`<gdbase><xbg title="title" decid="00000000" hexid="00000000" cover="0" thumb="0" md5="" size="" liveenabled="0" systemlink="0" patchtype="0" players="0" customsoundtracks="0" genre="" esrb="" publisher="" developer="" region="0" rc="0" video="1" vc="0" vidid="0"/></gdbase>`)
+    } catch (err) {
+        console.error('error in ux_game:', err)
+        res.status(500).send('')
     }
-
-    res.setHeader('Content-Type', 'text/xml')
-    res.send(`<gdbase><xbg title="${htmlEncode(info.title)}" decid="${parseInt(info.tid, 16)}" hexid="${info.tid}" video="${videoId ? -1 : 0}" vidid="${videoId}"/></gdbase>`)
-    //res.send(`<gdbase><xbg title="title" decid="00000000" hexid="00000000" cover="0" thumb="0" md5="" size="" liveenabled="0" systemlink="0" patchtype="0" players="0" customsoundtracks="0" genre="" esrb="" publisher="" developer="" region="0" rc="0" video="1" vc="0" vidid="0"/></gdbase>`)
 })
 
 app.get('/games/sendvid.php', async (req, res) => { //sends a preview of a game by it's id
-    logRequest('ux_vid', req)
+    try {
+        logRequest('ux_vid', req)
 
-    if (!req.headers['user-agent']) return res.redirect(req.url); //weird unleashx bug where it doesnt send request with a user agent sometimes and also wont do anything with the response, you just gotta try again
-
-    let videoId = parseInt(req.query.sid) - 1
-    if (isNaN(videoId)) return res.status(404).send('');
-    if (!previewIndex[videoId]) return res.status(404).send('');
-
-    let fileSize = (await fs.promises.stat(previewIndex[videoId].path)).size
-    let readStream = fs.createReadStream(previewIndex[videoId].path)
-
-    res.setHeader('Content-Type', 'video/x-ms-wmv')
-    res.stream(readStream, fileSize)
+        if (!req.headers['user-agent']) return res.redirect(req.url); //weird unleashx bug where it doesnt send request with a user agent sometimes and also wont do anything with the response, you just gotta try again
+    
+        let videoId = parseInt(req.query.sid) - 1
+        if (isNaN(videoId)) return res.status(404).send('');
+        if (!previewIndex[videoId]) return res.status(404).send('');
+    
+        let fileSize = (await fs.promises.stat(previewIndex[videoId].path)).size
+        let readStream = fs.createReadStream(previewIndex[videoId].path)
+    
+        res.setHeader('Content-Type', 'video/x-ms-wmv')
+        res.stream(readStream, fileSize)
+    } catch (err) {
+        console.error('error in ux_vid:', err)
+        res.status(500).send('')
+    }
 })
 
 //misc
 app.get('/*', async (req, res) => { //frontend
-    let reqPath = req.path
-    if (reqPath === '/') reqPath = '/index.html';
-
-    let file = static.get(reqPath)
-    if (file === undefined) return res.status(404).send('');
-
-    let fileType = path.extname(file.path)
-    res.type(fileType).send(file.content)
+    try {
+        let reqPath = req.path
+        if (reqPath === '/') reqPath = '/index.html';
+    
+        let file = static.get(reqPath)
+        if (file === undefined) return res.status(404).send('');
+    
+        let fileType = path.extname(file.path)
+        res.type(fileType).send(file.content)
+    } catch (err) {
+        console.error('error in frontend:', err)
+        res.status(500).send('internal server error')
+    }
 })
 
 app.get('/404/:message', (req, res) => { //unleashX will output :message due to it being the text after the last slash
