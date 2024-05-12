@@ -29,24 +29,29 @@ let previewIndex = []
 
 //functions
 function logRequest(endpoint = 'unknown', req) {
-    let origin;
-    if (config.cloudflareMode) {
-        let ip = req.headers['cf-connecting-ip'] || 'unknown';
-        let countryCode = req.headers['cf-ipcountry'] || 'unknown';
-        origin = `${ip} (${countryCode})`
-    } else if (req.headers['x-forwarded-for']) {
-        let forwardedFor = req.headers['x-forwarded-for']
-        let forwardedForSplit = forwardedFor.split(',')
-        origin = forwardedForSplit[forwardedForSplit.length - 1].trim() //parse the forwarded for ip (apache usually puts a comma if the client adds that header manually, so we get the first ip that the reverse proxy sent)
-    } else {
-        origin = 'unknown';
+    try {
+        let origin;
+        if (config.cloudflareMode) {
+            let ip = req.headers['cf-connecting-ip'] || 'unknown';
+            let countryCode = req.headers['cf-ipcountry'] || 'unknown';
+            origin = `${ip} (${countryCode})`
+        } else if (req.headers['x-forwarded-for']) {
+            let forwardedFor = req.headers['x-forwarded-for']
+            let forwardedForSplit = forwardedFor.split(',')
+            origin = forwardedForSplit[forwardedForSplit.length - 1].trim() //parse the forwarded for ip (apache usually puts a comma if the client adds that header manually, so we get the first ip that the reverse proxy sent)
+        } else {
+            origin = 'unknown';
+        }
+    
+        let onXbox = req.headers['user-agent']?.startsWith('Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1'); //if the ua starts with this, it's unleashX
+        let date = new Date().toISOString()
+    
+        console.log(`[${date}] ${endpoint} | ${onXbox ? 'on xbox' : 'not on xbox'} | from ${origin}`)
+        return true;
+    } catch (err) {
+        console.error('failed to parse and log request', req, err)
+        return false;
     }
-
-    let onXbox = req.headers['user-agent']?.startsWith('Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1'); //if the ua starts with this, it's unleashX
-    let date = new Date().toISOString()
-
-    console.log(`[${date}] ${endpoint} | ${onXbox ? 'on xbox' : 'not on xbox'} | from ${origin}`)
-    return true;
 }
 
 function htmlEncode(str) {
