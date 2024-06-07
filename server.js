@@ -29,6 +29,7 @@ let previewIndex = []
 
 //functions
 function logRequest(endpoint = 'unknown', req) {
+    if (!config.logging) return;
     try {
         let origin;
         if (config.cloudflareMode) {
