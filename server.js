@@ -1,10 +1,19 @@
 //requires
-const express = require('ultimate-express')
+const config = require('./config.json')
+
+let express;
+if (config.proxyRewritesHttpVersion) {
+    console.log('using ultimate-express')
+    express = require('ultimate-express')
+} else {
+    console.log('using regular express')
+    express = require('express')
+}
+
 const AdmZip = require('adm-zip')
 const fs = require('fs')
 const path = require('path')
 const titleIds = require('./files/titleIds.json')
-const config = require('./config.json')
 
 //setups
 if (!fs.existsSync('./files/skins')) return console.log('no skins folder in ./files/skins!');

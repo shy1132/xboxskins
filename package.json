@@ -1,6 +1,6 @@
 {
   "name": "xboxskins",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "",
   "main": "server.js",
   "scripts": {
@@ -19,6 +19,7 @@
   "homepage": "https://github.com/whakama/xboxskins#readme",
   "dependencies": {
     "adm-zip": "^0.5.16",
+    "express": "^4.21.0",
     "ultimate-express": "^1.0.3"
   }
 }
