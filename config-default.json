@@ -1,4 +1,5 @@
 {
     "logging": true,
-    "cloudflareMode": false
+    "cloudflareMode": false,
+    "baseUrl": "http://www.xbox-skins.net"
 }
