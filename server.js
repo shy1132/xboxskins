@@ -181,20 +181,18 @@ app.get('/downloads/skinThumbs/:skin', async (req, res) => { //sends a thumbnail
             'bmp': 'image/bmp'
         }
 
-        let formatsArr = Object.keys(formats)
-
         let buffer = await fs.promises.readFile(skinIndex[id].path)
         let zip = new AdmZip(buffer)
         let zipEntries = zip.getEntries()
 
         let contenders = []
-        let foundPreview = false
+        let foundPreview = false;
 
         for (let entry of Object.values(zipEntries)) {
             let entryName = path.basename(entry.entryName.toLowerCase())
             let entryExtension = path.extname(entryName).slice(1)
 
-            if (formatsArr.includes(entryExtension)) {
+            if (entryExtension in formats) {
                 if (entryName.startsWith('preview') || entryName.startsWith('screenshot')) {
                     foundPreview = true;
 
@@ -225,7 +223,7 @@ app.get('/downloads/skinThumbs/:skin', async (req, res) => { //sends a thumbnail
                 res.setHeader('Content-Type', formats[contenderEntryExtension])
                 res.send(data)
             })
-        } else {
+        } else if (contenders.length < 1 && !foundPreview) {
             res.status(200).send('')
         }
     } catch (err) {

@@ -1,6 +1,6 @@
 {
   "name": "xboxskins",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "",
   "main": "server.js",
   "scripts": {
@@ -20,6 +20,6 @@
   "dependencies": {
     "adm-zip": "^0.5.16",
     "express": "^4.21.0",
-    "ultimate-express": "^1.0.3"
+    "ultimate-express": "^1.2.29"
   }
 }
