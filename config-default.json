@@ -1,4 +1,5 @@
 {
+    "port": 80,
     "logging": true,
     "cloudflareMode": false,
     "proxyRewritesHttpVersion": false,

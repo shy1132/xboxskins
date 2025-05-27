@@ -26,9 +26,9 @@ app.disable('x-powered-by')
 
 //variables
 const baseUrl = config.baseUrl || 'http://www.xbox-skins.net'
-let skinIndex = []
+const skinIndex = []
 let skinsRssXml = ''
-let previewIndex = []
+const previewIndex = []
 
 //functions
 function logRequest(endpoint = 'unknown', req) {
@@ -286,12 +286,12 @@ app.get('/404/:message', (req, res) => { //unleashX will output :message due to 
     res.status(404).send('')
 })
 
-app.all('*', async (req, res) => { //catch-all, since its last itll just 404 everything else silently
+app.all('*', (req, res) => { //catch-all, since its last itll just 404 everything else silently
     res.status(404).send('')
 })
 
-app.listen(14380, () => {
-    console.log('listening on port 14380')
+app.listen(config.port, () => {
+    console.log(`listening on port ${config.port}`)
 })
 
 console.log('starting')
