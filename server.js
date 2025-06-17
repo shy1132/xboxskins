@@ -36,18 +36,18 @@ function logRequest(endpoint = 'unknown', req) {
     try {
         let origin;
         if (config.cloudflareMode) {
-            let ip = req.headers['cf-connecting-ip'] || 'unknown';
-            let countryCode = req.headers['cf-ipcountry'] || 'unknown';
+            let ip = req.headers['cf-connecting-ip'] || 'unknown'
+            let countryCode = req.headers['cf-ipcountry'] || 'unknown'
             origin = `${ip} (${countryCode})`
         } else if (req.headers['x-forwarded-for']) {
             let forwardedFor = req.headers['x-forwarded-for']
             let forwardedForSplit = forwardedFor.split(',')
             origin = forwardedForSplit[forwardedForSplit.length - 1].trim() //parse the forwarded for ip (apache usually puts a comma if the client adds that header manually, so we get the first ip that the reverse proxy sent)
         } else {
-            origin = 'unknown';
+            origin = 'unknown'
         }
 
-        let onXbox = req.headers['user-agent']?.startsWith('Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1'); //if the ua starts with this, it's unleashX
+        let onXbox = req.headers['user-agent']?.startsWith('Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1') //if the ua starts with this, it's unleashX
         let date = new Date().toISOString()
 
         console.log(`[${date}] ${endpoint} | ${onXbox ? 'on xbox' : 'not on xbox'} | from ${origin}`)
@@ -58,30 +58,30 @@ function logRequest(endpoint = 'unknown', req) {
     }
 }
 
-function htmlEncode(str) {
+function escape(str) {
     return String(str)
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;');
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
 }
 
 function rssEntry(title, link, thumb) {
     //validate link and if its invalid, just make it a placeholder
     try {
-        if (link) link = new URL(link).href
+        if (link) link = new URL(link).href;
     } catch {
         link = baseUrl + '/404/error'
     }
 
     //same but for thumbnail
     try {
-        if (thumb) thumb = new URL(thumb).href
+        if (thumb) thumb = new URL(thumb).href;
     } catch {
         thumb = baseUrl + '/thumb.jpg'
     }
 
-    return `<item><title>${htmlEncode(title)}</title><link>${link}</link><thumb>${thumb}</thumb></item>`;
+    return `<item><title>${escape(title)}</title><link>${link}</link><thumb>${thumb}</thumb></item>`;
 }
 
 async function initialize() {
@@ -211,7 +211,7 @@ app.get('/downloads/skinThumbs/:skin', async (req, res) => { //sends a thumbnail
 
         if (contenders.length > 0 && !foundPreview) {
             let largestContenderEntry = contenders.reduce((maxSizeContender, currentContender) => { //find the largest one (most likely to be a preview or a background of the skin which is sort of a preview)
-                let currentSize = currentContender.header.size
+                let currentSize = currentContender.header.size;
                 return currentSize > maxSizeContender.header.size ? currentContender : maxSizeContender;
             }, contenders[0])
 
@@ -256,7 +256,7 @@ app.get('/games/xml/:titleId', async (req, res) => { //sends an xml file from a 
         }
 
         res.setHeader('Content-Type', 'text/xml')
-        res.send(`<gdbase><xbg title="${htmlEncode(info.title)}" decid="${parseInt(info.tid, 16)}" hexid="${info.tid}" video="${videoId ? -1 : 0}" vidid="${videoId}"/></gdbase>`)
+        res.send(`<gdbase><xbg title="${escape(info.title)}" decid="${parseInt(info.tid, 16)}" hexid="${info.tid}" video="${videoId ? -1 : 0}" vidid="${videoId}"/></gdbase>`)
         //res.send(`<gdbase><xbg title="title" decid="00000000" hexid="00000000" cover="0" thumb="0" md5="" size="" liveenabled="0" systemlink="0" patchtype="0" players="0" customsoundtracks="0" genre="" esrb="" publisher="" developer="" region="0" rc="0" video="1" vc="0" vidid="0"/></gdbase>`)
     } catch (err) {
         console.error('error in ux_game:', err)
@@ -270,7 +270,7 @@ app.get('/games/sendvid.php', async (req, res) => { //sends a preview of a game 
 
         if (!req.headers['user-agent']) return res.redirect(req.url); //weird unleashx bug where it doesnt send request with a user agent sometimes and also wont do anything with the response, you just gotta try again
 
-        let videoId = parseInt(req.query.sid) - 1
+        let videoId = parseInt(req.query.sid) - 1;
         if (isNaN(videoId)) return res.status(404).send('');
         if (!previewIndex[videoId]) return res.status(404).send('');
 
