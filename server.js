@@ -85,14 +85,15 @@ async function initialize() {
 
     let items = [ //this will always show at the top, so i put some information here for anyone confused (since its just a giant list of skins)
         rssEntry('! Unofficial UnleashX Skin Downloader', `${baseUrl}/msg/this_is_not_a_skin`, `${baseUrl}/thumb.jpg`),
-        rssEntry('! See www.xbox-skins.net in your browser for more information', `${baseUrl}/msg/this_is_not_a_skin`, `${baseUrl}/thumb.jpg`)
+        rssEntry('!! See www.xbox-skins.net in your browser for more information', `${baseUrl}/msg/this_is_not_a_skin`, `${baseUrl}/thumb.jpg`)
     ]
 
     if (config.announcement) {
-        items.push(rssEntry(`! ${config.announcement}`, `${baseUrl}/msg/this_is_not_a_skin`, `${baseUrl}/thumb.jpg`))
+        items.push(rssEntry(`!!! ${config.announcement}`, `${baseUrl}/msg/this_is_not_a_skin`, `${baseUrl}/thumb.jpg`))
+        items.push(rssEntry(`!!!! ${'-'.repeat(91)}`, `${baseUrl}/msg/this_is_not_a_skin`, `${baseUrl}/thumb.jpg`))
+    } else {
+        items.push(rssEntry(`!!! ${'-'.repeat(91)}`, `${baseUrl}/msg/this_is_not_a_skin`, `${baseUrl}/thumb.jpg`))
     }
-
-    items.push(rssEntry(`! ${'-'.repeat(91)}`, `${baseUrl}/msg/this_is_not_a_skin`, `${baseUrl}/thumb.jpg`))
 
     let nsfwItems = []
 
