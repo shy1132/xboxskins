@@ -2,11 +2,9 @@
 const config = require('./config.json')
 
 let express;
-if (config.proxyRewritesHttpVersion) {
-    console.log('using ultimate-express')
+if (config.ultimateExpress) {
     express = require('ultimate-express')
 } else {
-    console.log('using regular express')
     express = require('express')
 }
 
@@ -31,33 +29,6 @@ let skinsRssXml = ''
 const previewIndex = []
 
 //functions
-function logRequest(endpoint = 'unknown', req) {
-    if (!config.logging) return;
-    try {
-        let origin;
-        if (config.cloudflareMode) {
-            let ip = req.headers['cf-connecting-ip'] || 'unknown'
-            let countryCode = req.headers['cf-ipcountry'] || 'unknown'
-            origin = `${ip} (${countryCode})`
-        } else if (req.headers['x-forwarded-for']) {
-            let forwardedFor = req.headers['x-forwarded-for']
-            let forwardedForSplit = forwardedFor.split(',')
-            origin = forwardedForSplit[forwardedForSplit.length - 1].trim() //parse the forwarded for ip (apache usually puts a comma if the client adds that header manually, so we get the first ip that the reverse proxy sent)
-        } else {
-            origin = 'unknown'
-        }
-
-        let onXbox = req.headers['user-agent']?.startsWith('Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1') //if the ua starts with this, it's unleashX
-        let date = new Date().toISOString()
-
-        console.log(`[${date}] ${endpoint} | ${onXbox ? 'on xbox' : 'not on xbox'} | from ${origin}`)
-        return true;
-    } catch (err) {
-        console.error('failed to parse and log request', req, err)
-        return false;
-    }
-}
-
 function escape(str) {
     return String(str)
     .replaceAll('&', '&amp;')
@@ -71,7 +42,7 @@ function rssEntry(title, link, thumb) {
     try {
         if (link) link = new URL(link).href;
     } catch {
-        link = baseUrl + '/404/error'
+        link = baseUrl + '/msg/error'
     }
 
     //same but for thumbnail
@@ -110,13 +81,18 @@ async function initialize() {
 
     console.log('finished indexing skins and previews')
 
-    console.log('compiling skin index to xml for ux_rss endpoint')
+    console.log('compiling skin index to xml for uxdash.php endpoint')
 
     let items = [ //this will always show at the top, so i put some information here for anyone confused (since its just a giant list of skins)
-        rssEntry('! unofficial UnleashX skin downloader', `${baseUrl}/404/this_is_not_a_skin`, `${baseUrl}/thumb.jpg`),
-        rssEntry('!! see www.xbox-skins.net in your browser for more information', `${baseUrl}/404/this_is_not_a_skin`, `${baseUrl}/thumb.jpg`),
-        rssEntry('!!! ------------------------------------------------------------------------------------------- !!!', `${baseUrl}/404/this_is_not_a_skin`, `${baseUrl}/thumb.jpg`)
+        rssEntry('! Unofficial UnleashX Skin Downloader', `${baseUrl}/msg/this_is_not_a_skin`, `${baseUrl}/thumb.jpg`),
+        rssEntry('!! See www.xbox-skins.net in your browser for more information', `${baseUrl}/msg/this_is_not_a_skin`, `${baseUrl}/thumb.jpg`)
     ]
+
+    if (config.announcement) {
+        items.push(rssEntry(`!!! ${config.announcement}`, `${baseUrl}/msg/this_is_not_a_skin`, `${baseUrl}/thumb.jpg`))
+    }
+
+    items.push(rssEntry(`${'-'.repeat(91)}`, `${baseUrl}/msg/this_is_not_a_skin`, `${baseUrl}/thumb.jpg`))
 
     let nsfwItems = []
 
@@ -125,9 +101,9 @@ async function initialize() {
         let fileName = path.basename(file.name, path.extname(file.name))
 
         if (fileName.includes('[NSFW]')) { //every nsfw skin has "[NSFW]" after the name
-            nsfwItems.push(rssEntry(`~${fileName}`, `${baseUrl}/downloads/skins/${file.id}.zip`, `${baseUrl}/downloads/skinThumbs/${file.id}.jpg`)) //~ before fileName to shove it down to the bottom, past all the other non nsfw skins
+            nsfwItems.push(rssEntry(`~${fileName}`, `${baseUrl}/downloads/skins/${file.id.toString(36)}.zip`, `${baseUrl}/downloads/skin-thumbs/${file.id.toString(36)}.jpg`)) //~ before fileName to shove it down to the bottom, past all the other non nsfw skins
         } else {
-            items.push(rssEntry(fileName, `${baseUrl}/downloads/skins/${file.id}.zip`, `${baseUrl}/downloads/skinThumbs/${file.id}.jpg`))
+            items.push(rssEntry(fileName, `${baseUrl}/downloads/skins/${file.id.toString(36)}.zip`, `${baseUrl}/downloads/skin-thumbs/${file.id.toString(36)}.jpg`))
         }
     }
 
@@ -137,41 +113,33 @@ async function initialize() {
     console.log('finished compiling skin index to xml')
 }
 
-initialize()
-
 //code
 //skin downloader
 app.get('/rss/uxdash.php', (req, res) => { //sends a giant xml of all the skins in the db (this has nothing to do with php but the original website used php)
     try {
-        logRequest('ux_rss', req)
-
         res.setHeader('Content-Type', 'text/xml')
         res.send(skinsRssXml)
     } catch (err) {
-        console.error('error in ux_rss:', err)
+        console.error(req.url, err)
         res.status(500).send('')
     }
 })
 
 app.get('/downloads/skins/:skin', async (req, res) => { //sends the zip file for a skin by it's id (obtained from the index of the skin in ux_rss)
     try {
-        logRequest('ux_skin', req)
-
-        let id = parseInt(req.params.skin) //will remove any extensions or such
+        let id = parseInt(req.params.skin, 36) //will remove any extensions or such
         if (id > skinIndex.length - 1 || id < 0 || isNaN(id)) return res.status(404).send('');
 
         res.sendFile(skinIndex[id].path)
     } catch (err) {
-        console.error('error in ux_skin:', err)
+        console.error(req.url, err)
         res.status(500).send('')
     }
 })
 
-app.get('/downloads/skinThumbs/:skin', async (req, res) => { //sends a thumbnail of the skin, skins are supposed to have a file in them for this so it reads through the files and tries to find it (img previews NEED a .jpg extension to work for some reason)
+app.get('/downloads/skin-thumbs/:skin', async (req, res) => { //sends a thumbnail of the skin, skins are supposed to have a file in them for this so it reads through the files and tries to find it (img previews NEED a .jpg extension to work for some reason)
     try {
-        logRequest('ux_thumb', req)
-
-        let id = parseInt(req.params.skin)
+        let id = parseInt(req.params.skin, 36)
         if (id > skinIndex.length - 1 || id < 0 || isNaN(id)) return res.status(404).send('');
 
         let formats = {
@@ -227,7 +195,7 @@ app.get('/downloads/skinThumbs/:skin', async (req, res) => { //sends a thumbnail
             res.status(200).send('')
         }
     } catch (err) {
-        console.error('error in ux_thumb:', err)
+        console.error(req.url, err)
         res.status(500).send('')
     }
 })
@@ -235,8 +203,6 @@ app.get('/downloads/skinThumbs/:skin', async (req, res) => { //sends a thumbnail
 //preview downloader
 app.get('/games/xml/:titleId', async (req, res) => { //sends an xml file from a game's title id
     try {
-        logRequest('ux_game', req)
-
         let titleIdParsed = parseInt(req.params.titleId, 16).toString(16).toUpperCase() //will remove any extensions or anything like that
         let titleId = encodeURIComponent(titleIdParsed)
         if (titleId.length != 8) return res.status(200).send(''); //200 on these because instead of requesting it to be added (not a feature never will be) itll just say it doesnt exist
@@ -259,15 +225,13 @@ app.get('/games/xml/:titleId', async (req, res) => { //sends an xml file from a 
         res.send(`<gdbase><xbg title="${escape(info.title)}" decid="${parseInt(info.tid, 16)}" hexid="${info.tid}" video="${videoId ? -1 : 0}" vidid="${videoId}"/></gdbase>`)
         //res.send(`<gdbase><xbg title="title" decid="00000000" hexid="00000000" cover="0" thumb="0" md5="" size="" liveenabled="0" systemlink="0" patchtype="0" players="0" customsoundtracks="0" genre="" esrb="" publisher="" developer="" region="0" rc="0" video="1" vc="0" vidid="0"/></gdbase>`)
     } catch (err) {
-        console.error('error in ux_game:', err)
+        console.error(req.url, err)
         res.status(500).send('')
     }
 })
 
 app.get('/games/sendvid.php', async (req, res) => { //sends a preview of a game by it's id
     try {
-        logRequest('ux_vid', req)
-
         if (!req.headers['user-agent']) return res.redirect(req.url); //weird unleashx bug where it doesnt send request with a user agent sometimes and also wont do anything with the response, you just gotta try again
 
         let videoId = parseInt(req.query.sid) - 1;
@@ -276,13 +240,13 @@ app.get('/games/sendvid.php', async (req, res) => { //sends a preview of a game 
 
         res.sendFile(previewIndex[videoId].path)
     } catch (err) {
-        console.error('error in ux_vid:', err)
+        console.error(req.url, err)
         res.status(500).send('')
     }
 })
 
 //misc
-app.get('/404/:message', (req, res) => { //unleashX will output :message due to it being the text after the last slash
+app.get('/msg/:message', (req, res) => { //unleashX will output :message due to it being the text after the last slash
     res.status(404).send('')
 })
 
@@ -290,8 +254,13 @@ app.all('*', (req, res) => { //catch-all, since its last itll just 404 everythin
     res.status(404).send('')
 })
 
-app.listen(config.port, () => {
-    console.log(`listening on port ${config.port}`)
+initialize()
+.then(() => {
+    app.listen(config.port, () => {
+        console.log(`listening on port ${config.port}`)
+    })
 })
-
-console.log('starting')
+.catch((err) => {
+    console.error('failed to initialize', err)
+    process.exit(1)
+})

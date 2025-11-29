@@ -127,6 +127,6 @@ dist
 .pnp.*
 
 # specific to this repo
-files/skins
-files/previews
+files/skins/*
+files/previews/*
 config.json

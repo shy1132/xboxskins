@@ -1,7 +1,6 @@
 {
     "port": 80,
-    "logging": true,
-    "cloudflareMode": false,
-    "proxyRewritesHttpVersion": false,
-    "baseUrl": "http://www.xbox-skins.net"
+    "ultimateExpress": false,
+    "baseUrl": "http://www.xbox-skins.net",
+    "announcement": null
 }
