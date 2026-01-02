@@ -19,7 +19,7 @@
   "homepage": "https://github.com/shy1132/xboxskins#readme",
   "dependencies": {
     "adm-zip": "^0.5.16",
-    "express": "^4.21.2",
-    "ultimate-express": "^2.0.12"
+    "express": "^4.22.1",
+    "ultimate-express": "^2.0.14"
   }
 }
